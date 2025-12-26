@@ -38,3 +38,9 @@ exports.approveSeller = async (req, res) => {
 
   res.json({ message: "Seller approved" });
 };
+
+/* ADMIN: GET ALL SELLERS */
+exports.getAllSellers = async (req, res) => {
+  const sellers = await Seller.find().populate("user", "email role");
+  res.json(sellers);
+};

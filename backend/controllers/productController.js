@@ -50,4 +50,22 @@ exports.getSellerProducts = async (req, res) => {
 
   res.json(pricedProducts);
 };
+/* PUBLIC: GET ALL ACTIVE PRODUCTS */
+
+
+exports.getAllProducts = async (req, res) => {
+  const products = await Product.find({ isActive: true }).populate("seller");
+
+  const pricedProducts = products.map((product) => ({
+    ...product.toObject(),
+    dynamicPrice: calculateDynamicPrice({
+      basePrice: product.price,
+      stock: product.stock,
+      createdAt: product.createdAt,
+    }),
+  }));
+
+  res.json(pricedProducts);
+};
+
 
