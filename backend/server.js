@@ -59,3 +59,5 @@ app.use("/api/refunds", refundRoutes);
 const adminRoutes = require("./routes/adminRoutes");
 
 app.use("/api/admin", adminRoutes);
+
+app.use("/api/analytics", require("./routes/analyticsRoutes"));

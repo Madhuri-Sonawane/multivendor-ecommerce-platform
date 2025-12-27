@@ -6,60 +6,42 @@ const calculateDynamicPrice = require("../utils/priceLogic");
 /* ================================
    CREATE ORDER (USER)
 ================================ */
+const Order = require("../models/Order");
+const Product = require("../models/Product");
+
 exports.createOrder = async (req, res) => {
-  const { items } = req.body;
+  try {
+    const product = await Product.findById(req.body.productId);
 
-  if (!items || items.length === 0) {
-    return res.status(400).json({ message: "Order items required" });
-  }
-
-  let totalAmount = 0;
-  let sellerId = null;
-  const orderItems = [];
-
-  for (const item of items) {
-    const product = await Product.findById(item.productId);
-
-    if (!product || !product.isActive) {
+    if (!product)
       return res.status(404).json({ message: "Product not found" });
-    }
 
-    const dynamicPrice = calculateDynamicPrice({
-      basePrice: product.price,
-      stock: product.stock,
-      createdAt: product.createdAt,
+    if (!product.isActive)
+      return res
+        .status(403)
+        .json({ message: "Product is currently unavailable" });
+
+    if (product.stock <= 0)
+      return res.status(400).json({ message: "Out of stock" });
+
+    const order = await Order.create({
+      user: req.user._id,
+      seller: product.seller,
+      product: product._id,
+      price: product.price,
+      status: "pending",
     });
 
-    if (product.stock < item.quantity) {
-      return res.status(400).json({ message: "Insufficient stock" });
-    }
-
-    // reduce stock
-    product.stock -= item.quantity;
+    product.stock -= 1;
     await product.save();
 
-    totalAmount += dynamicPrice * item.quantity;
-
-    // assign seller from product
-    sellerId = product.seller;
-
-    orderItems.push({
-      product: product._id,
-      quantity: item.quantity,
-      priceAtPurchase: dynamicPrice,
-    });
+    res.status(201).json(order);
+  } catch (err) {
+    console.error("CREATE ORDER ERROR:", err);
+    res.status(500).json({ message: "Order failed" });
   }
-
-  const order = await Order.create({
-    user: req.user._id,
-    seller: sellerId, // IMPORTANT: seller._id
-    items: orderItems,
-    totalAmount,
-    status: "pending",
-  });
-
-  res.status(201).json(order);
 };
+
 
 /* ================================
    USER: VIEW OWN ORDERS

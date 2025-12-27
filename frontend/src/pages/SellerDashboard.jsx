@@ -5,6 +5,7 @@ import Layout from "../components/Layout";
 export default function SellerDashboard() {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -21,12 +22,17 @@ export default function SellerDashboard() {
     category: "",
   });
 
-  /* ================= FETCH ================= */
+  /* ================= FETCH DATA ================= */
   const fetchData = async () => {
-    const prodRes = await api.get("/products/my-products");
-    const orderRes = await api.get("/orders/seller");
+    const [prodRes, orderRes, analyticsRes] = await Promise.all([
+      api.get("/products/my-products"),
+      api.get("/orders/seller"),
+      api.get("/analytics/seller"),
+    ]);
+
     setProducts(prodRes.data);
     setOrders(orderRes.data);
+    setAnalytics(analyticsRes.data);
   };
 
   useEffect(() => {
@@ -34,9 +40,8 @@ export default function SellerDashboard() {
   }, []);
 
   /* ================= FORM ================= */
-  const handleChange = (e) => {
+  const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
-  };
 
   const handleImages = (e) => {
     const files = Array.from(e.target.files);
@@ -99,13 +104,21 @@ export default function SellerDashboard() {
         </button>
       </div>
 
-      {/* ================= MODAL ================= */}
+      {/* ANALYTICS */}
+      {analytics && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Stat label="Products" value={analytics.products.total} />
+          <Stat label="Active" value={analytics.products.active} />
+          <Stat label="Orders" value={analytics.orders.total} />
+          <Stat label="Revenue" value={`₹${analytics.revenue}`} />
+        </div>
+      )}
+
+      {/* MODAL */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white max-w-lg w-full p-6 rounded-xl relative">
-            <button onClick={resetForm} className="absolute top-3 right-3">
-              ✕
-            </button>
+            <button onClick={resetForm} className="absolute top-3 right-3">✕</button>
 
             <h2 className="text-xl font-semibold mb-4">
               {editingProduct ? "Edit Product" : "Add Product"}
@@ -125,7 +138,7 @@ export default function SellerDashboard() {
               <input type="file" multiple accept="image/*" onChange={handleImages} />
 
               {existingImages.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mt-2">
+                <div className="grid grid-cols-3 gap-2">
                   {existingImages.map((img) => (
                     <div key={img} className="relative">
                       <img src={`http://localhost:5000/uploads/${img}`} className="h-20 w-full object-cover rounded" />
@@ -152,66 +165,7 @@ export default function SellerDashboard() {
         </div>
       )}
 
-      {/* ================= PRODUCTS ================= */}
-      <div className="bg-white rounded shadow mb-8">
-        <h2 className="text-lg font-semibold p-4 border-b">My Products</h2>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-          {products.map((p) => (
-            <div key={p._id} className="border rounded-lg overflow-hidden">
-              {p.images?.length ? (
-                <img src={`http://localhost:5000/uploads/${p.images[0]}`} className="h-40 w-full object-cover" />
-              ) : (
-                <div className="h-40 bg-gray-200 flex items-center justify-center">No Image</div>
-              )}
-
-              <div className="p-4">
-                {/* STATUS BADGE */}
-                <span
-                  className={`inline-block mb-1 px-2 py-0.5 text-xs rounded ${
-                    p.isActive ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  {p.isActive ? "Active" : "Disabled"}
-                </span>
-
-                <p className="font-semibold">{p.title}</p>
-                <p className="text-sm text-gray-500">{p.category}</p>
-                <p className="text-sm mt-1">₹{p.price} · Stock: {p.stock}</p>
-
-                <div className="flex justify-between mt-3">
-                  <button
-                    onClick={() => {
-                      setEditingProduct(p);
-                      setForm(p);
-                      setExistingImages(p.images || []);
-                      setRemovedImages([]);
-                      setShowForm(true);
-                    }}
-                    className="text-sm text-indigo-600"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      await api.patch(`/products/${p._id}/toggle`);
-                      fetchData();
-                    }}
-                    className={`text-sm px-3 py-1 rounded ${
-                      p.isActive ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {p.isActive ? "Disable" : "Enable"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ================= ORDERS ================= */}
+      {/* ORDERS */}
       <div className="bg-white rounded shadow">
         <h2 className="text-lg font-semibold p-4 border-b">Orders</h2>
         {orders.map((o) => (
@@ -219,12 +173,8 @@ export default function SellerDashboard() {
             <p className="font-medium">Order #{o._id}</p>
             <p>Status: {o.status}</p>
             <div className="space-x-2 mt-2">
-              <button disabled={o.status !== "pending"} onClick={() => updateStatus(o._id, "shipped")} className="px-3 py-1 border rounded">
-                Ship
-              </button>
-              <button disabled={o.status !== "shipped"} onClick={() => updateStatus(o._id, "delivered")} className="px-3 py-1 border rounded">
-                Deliver
-              </button>
+              <button disabled={o.status !== "pending"} onClick={() => updateStatus(o._id, "shipped")} className="px-3 py-1 border rounded">Ship</button>
+              <button disabled={o.status !== "shipped"} onClick={() => updateStatus(o._id, "delivered")} className="px-3 py-1 border rounded">Deliver</button>
             </div>
           </div>
         ))}
@@ -232,3 +182,10 @@ export default function SellerDashboard() {
     </Layout>
   );
 }
+
+const Stat = ({ label, value }) => (
+  <div className="bg-white p-4 rounded shadow text-center">
+    <p className="text-sm text-gray-500">{label}</p>
+    <p className="text-xl font-bold">{value}</p>
+  </div>
+);
