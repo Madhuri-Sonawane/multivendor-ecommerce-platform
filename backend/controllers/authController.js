@@ -18,23 +18,16 @@ exports.registerUser = async (req, res) => {
     return res.status(400).json({ message: "User already exists" });
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  // ❌ DO NOT hash password here
+  // ✅ Mongoose pre-save hook will handle it
 
   const user = await User.create({
     name,
     email,
-    password: hashedPassword,
+    password, // plain password here
     role,
   });
 
-  // 🔥 AUTO-CREATE SELLER PROFILE
-  if (role === "seller") {
-    await Seller.create({
-      user: user._id,
-      storeName: `${name}'s Store`,
-      isApproved: false,
-    });
-  }
 
   res.status(201).json({
     _id: user._id,
@@ -51,12 +44,15 @@ exports.registerUser = async (req, res) => {
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email }).select("+password");
   if (!user) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
+  // Use bcrypt directly OR model method
   const isMatch = await bcrypt.compare(password, user.password);
+  // OR: await user.matchPassword(password);
+
   if (!isMatch) {
     return res.status(401).json({ message: "Invalid credentials" });
   }

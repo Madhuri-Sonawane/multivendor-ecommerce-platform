@@ -2,70 +2,142 @@ const Product = require("../models/Product");
 const Seller = require("../models/Seller");
 const calculateDynamicPrice = require("../utils/priceLogic");
 
-
-/* CREATE PRODUCT (SELLER ONLY) */
+/* CREATE PRODUCT */
 exports.createProduct = async (req, res) => {
-  
-  const { title, description, price, stock, category } = req.body;
+  try {
+    const { title, description, price, stock, category } = req.body;
 
-  if (!title || !price || !category)
-    return res.status(400).json({ message: "Missing required fields" });
+    if (!title || !price || !category) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
 
-  const seller = await Seller.findOne({ user: req.user._id });
+    const seller = await Seller.findOne({ user: req.user._id });
+    if (!seller || !seller.isApproved) {
+      return res.status(403).json({ message: "Seller not approved" });
+    }
 
-  if (!seller || !seller.isApproved)
-    return res
-      .status(403)
-      .json({ message: "Seller not approved or not found" });
+    const images = req.files ? req.files.map((f) => f.filename) : [];
 
-  const product = await Product.create({
-    seller: seller._id,
-    title,
-    description,
-    price,
-    stock,
-    category,
-  });
+    const product = await Product.create({
+      seller: seller._id,
+      title,
+      description,
+      price,
+      stock,
+      category,
+      images,
+    });
 
-  res.status(201).json(product);
+    res.status(201).json(product);
+  } catch (err) {
+    console.error("CREATE PRODUCT ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 /* GET SELLER PRODUCTS */
 exports.getSellerProducts = async (req, res) => {
-  const seller = await Seller.findOne({ user: req.user._id });
+  try {
+    const seller = await Seller.findOne({ user: req.user._id });
+    if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-  if (!seller)
-    return res.status(404).json({ message: "Seller not found" });
+    const products = await Product.find({ seller: seller._id });
 
-  const products = await Product.find({ seller: seller._id });
-
-  const pricedProducts = products.map((product) => ({
-    ...product.toObject(),
-    dynamicPrice: calculateDynamicPrice({
-      basePrice: product.price,
-      stock: product.stock,
-      createdAt: product.createdAt,
-    }),
-  }));
-
-  res.json(pricedProducts);
+    res.json(
+      products.map((p) => ({
+        ...p.toObject(),
+        dynamicPrice: calculateDynamicPrice({
+          basePrice: p.price,
+          stock: p.stock,
+          createdAt: p.createdAt,
+        }),
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
-/* PUBLIC: GET ALL ACTIVE PRODUCTS */
 
-
+/* PUBLIC PRODUCTS */
 exports.getAllProducts = async (req, res) => {
-  const products = await Product.find({ isActive: true }).populate("seller");
+  try {
+    const products = await Product.find({ isActive: true }).populate("seller");
 
-  const pricedProducts = products.map((product) => ({
-    ...product.toObject(),
-    dynamicPrice: calculateDynamicPrice({
-      basePrice: product.price,
-      stock: product.stock,
-      createdAt: product.createdAt,
-    }),
-  }));
-
-  res.json(pricedProducts);
+    res.json(
+      products.map((p) => ({
+        ...p.toObject(),
+        dynamicPrice: calculateDynamicPrice({
+          basePrice: p.price,
+          stock: p.stock,
+          createdAt: p.createdAt,
+        }),
+      }))
+    );
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
+/* UPDATE PRODUCT */
+exports.updateProduct = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
 
+    const seller = await Seller.findOne({ user: req.user._id });
+    if (!seller || product.seller.toString() !== seller._id.toString()) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const { title, description, price, stock, category, removedImages } =
+      req.body;
+
+    if (removedImages) {
+      const removed = JSON.parse(removedImages);
+      product.images = product.images.filter(
+        (img) => !removed.includes(img)
+      );
+    }
+
+    const newImages = req.files?.map((f) => f.filename) || [];
+    product.images.push(...newImages);
+
+    product.title = title;
+    product.description = description;
+    product.price = price;
+    product.stock = stock;
+    product.category = category;
+
+    await product.save();
+    res.json(product);
+  } catch (err) {
+    console.error("UPDATE PRODUCT ERROR:", err);
+    res.status(500).json({ message: "Update failed" });
+  }
+};
+
+/* TOGGLE PRODUCT (SOFT DELETE) */
+exports.toggleProductStatus = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product)
+      return res.status(404).json({ message: "Product not found" });
+
+    const seller = await Seller.findOne({ user: req.user._id });
+    if (!seller || product.seller.toString() !== seller._id.toString()) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    product.isActive = !product.isActive;
+    await product.save();
+
+    res.json({
+      message: `Product ${product.isActive ? "enabled" : "disabled"}`,
+      isActive: product.isActive,
+    });
+  } catch (err) {
+    console.error("TOGGLE PRODUCT ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
