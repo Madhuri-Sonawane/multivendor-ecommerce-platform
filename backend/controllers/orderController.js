@@ -3,11 +3,7 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const calculateDynamicPrice = require("../utils/priceLogic");
 
-/* ================================
-   CREATE ORDER (USER)
-================================ */
-const Order = require("../models/Order");
-const Product = require("../models/Product");
+
 
 exports.createOrder = async (req, res) => {
   try {
