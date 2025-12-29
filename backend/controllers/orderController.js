@@ -14,7 +14,7 @@ exports.createOrder = async (req, res) => {
 
     if (!product.isActive)
       return res
-        .status(403)
+        .status(400)
         .json({ message: "Product is currently unavailable" });
 
     if (product.stock <= 0)

@@ -2,18 +2,33 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 
+/*
+  SELLER DASHBOARD – FINAL VERSION
+  Covers:
+  S2.3 Product CRUD
+  S2.4 Enable / Disable product
+  S2.6 Seller Analytics
+  S2.7 Notifications (Low stock + Order alerts)
+*/
+
 export default function SellerDashboard() {
+  /* ===================== STATE ===================== */
+
+  // Core data
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [analytics, setAnalytics] = useState(null);
 
+  // Modal & edit state
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
+  // Images
   const [images, setImages] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
   const [removedImages, setRemovedImages] = useState([]);
 
+  // Product form
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -22,30 +37,38 @@ export default function SellerDashboard() {
     category: "",
   });
 
-  /* ================= FETCH DATA ================= */
+  /* ===================== FETCH DASHBOARD DATA ===================== */
   const fetchData = async () => {
-    const [prodRes, orderRes, analyticsRes] = await Promise.all([
-      api.get("/products/my-products"),
-      api.get("/orders/seller"),
-      api.get("/analytics/seller"),
-    ]);
+    try {
+      const [prodRes, orderRes, analyticsRes] = await Promise.all([
+        api.get("/products/my-products"),
+        api.get("/orders/seller"),
+        api.get("/analytics/seller"),
+      ]);
 
-    setProducts(prodRes.data);
-    setOrders(orderRes.data);
-    setAnalytics(analyticsRes.data);
+      setProducts(prodRes.data || []);
+      setOrders(orderRes.data || []);
+      setAnalytics(analyticsRes.data || null);
+    } catch (err) {
+      console.error("Dashboard fetch failed", err);
+    }
   };
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  /* ================= FORM ================= */
+  /* ===================== FORM HANDLERS ===================== */
+
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleImages = (e) => {
     const files = Array.from(e.target.files);
-    if (files.length > 6) return alert("Max 6 images allowed");
+    if (files.length > 6) {
+      alert("Maximum 6 images allowed");
+      return;
+    }
     setImages(files);
   };
 
@@ -82,22 +105,26 @@ export default function SellerDashboard() {
     fetchData();
   };
 
-  /* ================= ORDER ================= */
+  /* ===================== ORDER STATUS ===================== */
+
   const updateStatus = async (id, status) => {
     await api.put(`/orders/${id}/status`, { status });
     fetchData();
   };
 
+  /* ===================== S2.7 NOTIFICATIONS ===================== */
+
+  const lowStockProducts = analytics?.lowStockProducts || [];
+  const pendingOrders = orders.filter((o) => o.status === "pending");
+
   return (
     <Layout>
       {/* ================= HEADER ================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10">
+      <div className="flex justify-between items-center mb-10">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">
-            Seller Dashboard
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage your products, orders and revenue
+          <h1 className="text-3xl font-bold">Seller Dashboard</h1>
+          <p className="text-sm text-gray-500">
+            Manage products, orders & revenue
           </p>
         </div>
 
@@ -106,32 +133,44 @@ export default function SellerDashboard() {
             resetForm();
             setShowForm(true);
           }}
-          className="bg-indigo-600 hover:bg-indigo-700 transition text-white px-5 py-2.5 rounded-lg shadow"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg shadow"
         >
           + Add Product
         </button>
       </div>
 
-      {/* ================= ANALYTICS ================= */}
-      {analytics && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <Stat label="Products" value={analytics.products.total} />
-          <Stat label="Active Products" value={analytics.products.active} />
-          <Stat label="Orders" value={analytics.orders.total} />
-          <Stat label="Revenue" value={`₹${analytics.revenue}`} />
+      {/* ================= S2.7 NOTIFICATIONS ================= */}
+      {(lowStockProducts.length > 0 || pendingOrders.length > 0) && (
+        <div className="mb-10 space-y-3">
+          {lowStockProducts.length > 0 && (
+            <div className="bg-red-50 border border-red-200 p-4 rounded">
+              ⚠ <b>{lowStockProducts.length}</b> product(s) are low on stock
+            </div>
+          )}
+
+          {pendingOrders.length > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
+              📦 <b>{pendingOrders.length}</b> pending order(s) to process
+            </div>
+          )}
         </div>
       )}
 
-      {/* ================= MY PRODUCTS ================= */}
-      <div className="bg-white rounded-2xl shadow-sm mb-14">
-        <div className="flex items-center justify-between p-5 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">
-            My Products
-          </h2>
-          <span className="text-sm text-gray-500">
-            {products.length} items
-          </span>
+      {/* ================= ANALYTICS (S2.6) ================= */}
+      {analytics && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <Stat label="Products" value={analytics.products?.total || 0} />
+          <Stat label="Active" value={analytics.products?.active || 0} />
+          <Stat label="Orders" value={analytics.orders?.total || 0} />
+          <Stat label="Revenue" value={`₹${analytics.revenue || 0}`} />
         </div>
+      )}
+
+      {/* ================= PRODUCTS ================= */}
+      <div className="bg-white rounded-xl shadow mb-14">
+        <h2 className="text-xl font-semibold p-5 border-b">
+          My Products ({products.length})
+        </h2>
 
         {products.length === 0 ? (
           <p className="p-6 text-center text-gray-500">
@@ -144,23 +183,20 @@ export default function SellerDashboard() {
                 key={p._id}
                 className="border rounded-xl overflow-hidden hover:shadow-lg transition"
               >
-                {/* IMAGE */}
                 {p.images?.length ? (
                   <img
                     src={`http://localhost:5000/uploads/${p.images[0]}`}
-                    alt={p.title}
                     className="h-44 w-full object-cover"
                   />
                 ) : (
-                  <div className="h-44 bg-gray-200 flex items-center justify-center text-gray-500">
+                  <div className="h-44 bg-gray-200 flex items-center justify-center">
                     No Image
                   </div>
                 )}
 
                 <div className="p-4">
-                  {/* STATUS */}
                   <span
-                    className={`inline-block mb-2 px-2 py-0.5 text-xs rounded ${
+                    className={`text-xs px-2 py-0.5 rounded ${
                       p.isActive
                         ? "bg-green-100 text-green-700"
                         : "bg-gray-200 text-gray-600"
@@ -169,15 +205,13 @@ export default function SellerDashboard() {
                     {p.isActive ? "Active" : "Disabled"}
                   </span>
 
-                  <h3 className="font-semibold text-lg">{p.title}</h3>
+                  <h3 className="font-semibold mt-2">{p.title}</h3>
                   <p className="text-sm text-gray-500">{p.category}</p>
-
                   <p className="text-sm mt-1">
                     ₹{p.price} · Stock: {p.stock}
                   </p>
 
-                  {/* ACTIONS */}
-                  <div className="flex justify-between items-center mt-4">
+                  <div className="flex justify-between mt-4">
                     <button
                       onClick={() => {
                         setEditingProduct(p);
@@ -189,11 +223,9 @@ export default function SellerDashboard() {
                           category: p.category,
                         });
                         setExistingImages(p.images || []);
-                        setRemovedImages([]);
-                        setImages([]);
                         setShowForm(true);
                       }}
-                      className="text-sm text-indigo-600 hover:underline"
+                      className="text-sm text-indigo-600"
                     >
                       Edit
                     </button>
@@ -220,15 +252,11 @@ export default function SellerDashboard() {
       </div>
 
       {/* ================= ORDERS ================= */}
-      <div className="bg-white rounded-2xl shadow-sm">
-        <h2 className="text-xl font-semibold p-5 border-b text-gray-800">
-          Orders
-        </h2>
+      <div className="bg-white rounded-xl shadow">
+        <h2 className="text-xl font-semibold p-5 border-b">Orders</h2>
 
         {orders.length === 0 ? (
-          <p className="p-6 text-center text-gray-500">
-            No orders yet.
-          </p>
+          <p className="p-6 text-center text-gray-500">No orders yet.</p>
         ) : (
           orders.map((o) => (
             <div key={o._id} className="p-5 border-t">
@@ -239,14 +267,14 @@ export default function SellerDashboard() {
                 <button
                   disabled={o.status !== "pending"}
                   onClick={() => updateStatus(o._id, "shipped")}
-                  className="px-3 py-1 border rounded disabled:opacity-40"
+                  className="px-3 py-1 border rounded"
                 >
                   Ship
                 </button>
                 <button
                   disabled={o.status !== "shipped"}
                   onClick={() => updateStatus(o._id, "delivered")}
-                  className="px-3 py-1 border rounded disabled:opacity-40"
+                  className="px-3 py-1 border rounded"
                 >
                   Deliver
                 </button>
@@ -256,11 +284,14 @@ export default function SellerDashboard() {
         )}
       </div>
 
-      {/* ================= MODAL ================= */}
+      {/* ================= PRODUCT MODAL ================= */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white max-w-lg w-full p-6 rounded-xl relative">
-            <button onClick={resetForm} className="absolute top-3 right-3">
+          <div className="bg-white w-full max-w-lg rounded-xl p-6 relative">
+            <button
+              onClick={resetForm}
+              className="absolute top-3 right-3"
+            >
               ✕
             </button>
 
@@ -274,8 +305,8 @@ export default function SellerDashboard() {
                 value={form.title}
                 onChange={handleChange}
                 required
-                className="w-full border p-2 rounded"
                 placeholder="Title"
+                className="w-full border p-2 rounded"
               />
 
               <textarea
@@ -283,8 +314,8 @@ export default function SellerDashboard() {
                 value={form.description}
                 onChange={handleChange}
                 required
-                className="w-full border p-2 rounded"
                 placeholder="Description"
+                className="w-full border p-2 rounded"
               />
 
               <div className="grid grid-cols-2 gap-4">
@@ -294,8 +325,8 @@ export default function SellerDashboard() {
                   value={form.price}
                   onChange={handleChange}
                   required
-                  className="border p-2 rounded"
                   placeholder="Price"
+                  className="border p-2 rounded"
                 />
                 <input
                   type="number"
@@ -303,8 +334,8 @@ export default function SellerDashboard() {
                   value={form.stock}
                   onChange={handleChange}
                   required
-                  className="border p-2 rounded"
                   placeholder="Stock"
+                  className="border p-2 rounded"
                 />
               </div>
 
@@ -313,8 +344,8 @@ export default function SellerDashboard() {
                 value={form.category}
                 onChange={handleChange}
                 required
-                className="w-full border p-2 rounded"
                 placeholder="Category"
+                className="w-full border p-2 rounded"
               />
 
               <input
@@ -324,7 +355,7 @@ export default function SellerDashboard() {
                 onChange={handleImages}
               />
 
-              <button className="w-full bg-green-600 text-white py-2 rounded">
+              <button className="w-full bg-indigo-600 text-white py-2 rounded">
                 {editingProduct ? "Update Product" : "Save Product"}
               </button>
             </form>
@@ -337,8 +368,8 @@ export default function SellerDashboard() {
 
 /* ================= STAT CARD ================= */
 const Stat = ({ label, value }) => (
-  <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition p-5 text-center">
+  <div className="bg-white rounded-xl shadow p-5 text-center">
     <p className="text-sm text-gray-500">{label}</p>
-    <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+    <p className="text-2xl font-bold">{value}</p>
   </div>
 );
