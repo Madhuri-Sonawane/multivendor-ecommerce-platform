@@ -1,26 +1,55 @@
-const Order = require("../models/Order");
 const Seller = require("../models/Seller");
-const Refund = require("../models/Refund");
+const Order = require("../models/Order");
 
-/* ADMIN DASHBOARD STATS */
-exports.getDashboardStats = async (req, res) => {
-  const totalOrders = await Order.countDocuments();
+/* ================= PENDING SELLERS ================= */
+exports.getPendingSellers = async (req, res) => {
+  try {
+    const sellers = await Seller.find({ isApproved: false })
+      .populate("user", "name email");
 
-  const totalRevenueData = await Order.aggregate([
-    { $match: { status: { $in: ["paid", "shipped", "delivered"] } } },
-    { $group: { _id: null, revenue: { $sum: "$totalAmount" } } },
-  ]);
+    res.json(sellers);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to load pending sellers" });
+  }
+};
 
-  const totalRevenue =
-    totalRevenueData.length > 0 ? totalRevenueData[0].revenue : 0;
+/* ================= APPROVE SELLER ================= */
+exports.approveSeller = async (req, res) => {
+  try {
+    const seller = await Seller.findById(req.params.id);
+    if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-  const totalSellers = await Seller.countDocuments({ isApproved: true });
-  const totalRefunds = await Refund.countDocuments();
+    seller.isApproved = true;
+    await seller.save();
 
-  res.json({
-    totalOrders,
-    totalRevenue,
-    totalSellers,
-    totalRefunds,
-  });
+    res.json({ message: "Seller approved" });
+  } catch (err) {
+    res.status(500).json({ message: "Approval failed" });
+  }
+};
+
+/* ================= REJECT SELLER ================= */
+exports.rejectSeller = async (req, res) => {
+  try {
+    await Seller.findByIdAndDelete(req.params.id);
+    res.json({ message: "Seller rejected & removed" });
+  } catch (err) {
+    res.status(500).json({ message: "Rejection failed" });
+  }
+};
+
+/* ================= TRIGGER PAYOUT ================= */
+exports.triggerPayout = async (req, res) => {
+  try {
+    const { sellerId } = req.body;
+
+    await Order.updateMany(
+      { seller: sellerId, payoutStatus: "pending" },
+      { payoutStatus: "paid" }
+    );
+
+    res.json({ message: "Seller payout completed" });
+  } catch (err) {
+    res.status(500).json({ message: "Payout failed" });
+  }
 };

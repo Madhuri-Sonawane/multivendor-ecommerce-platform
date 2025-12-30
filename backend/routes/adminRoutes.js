@@ -1,16 +1,18 @@
 const express = require("express");
-const { getDashboardStats } = require("../controllers/adminController");
+const {
+  approveSeller,
+  rejectSeller,
+  getPendingSellers,
+  triggerPayout,
+} = require("../controllers/adminController");
 
-const { protect } = require("../middleware/authMiddleware");
-const { allowRoles } = require("../middleware/roleMiddleware");
+const { protect, adminOnly } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.get(
-  "/dashboard",
-  protect,
-  allowRoles("admin"),
-  getDashboardStats
-);
+router.get("/sellers/pending", protect, adminOnly, getPendingSellers);
+router.patch("/sellers/:id/approve", protect, adminOnly, approveSeller);
+router.patch("/sellers/:id/reject", protect, adminOnly, rejectSeller);
+router.post("/payout", protect, adminOnly, triggerPayout);
 
 module.exports = router;

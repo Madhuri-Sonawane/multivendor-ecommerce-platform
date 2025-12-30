@@ -1,56 +1,57 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
+import ProductForm from "../components/ProductForm";
 
 /*
-  SELLER DASHBOARD – FINAL VERSION
-  Covers:
-  S2.3 Product CRUD
-  S2.4 Enable / Disable product
-  S2.6 Seller Analytics
-  S2.7 Notifications (Low stock + Order alerts)
+  Seller Dashboard
+  - S2.7 Operational metrics (frontend)
+  - S2.8 Earnings UI
+  - Fully guarded & stable
 */
 
 export default function SellerDashboard() {
-  /* ===================== STATE ===================== */
-
-  // Core data
+  /* ================= STATE ================= */
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [earnings, setEarnings] = useState(null);
 
-  // Modal & edit state
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // Images
-  const [images, setImages] = useState([]);
-  const [existingImages, setExistingImages] = useState([]);
-  const [removedImages, setRemovedImages] = useState([]);
-
-  // Product form
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    price: "",
-    stock: "",
-    category: "",
-  });
-
-  /* ===================== FETCH DASHBOARD DATA ===================== */
+  /* ================= FETCH DATA ================= */
   const fetchData = async () => {
     try {
-      const [prodRes, orderRes, analyticsRes] = await Promise.all([
+      const [
+        productsRes,
+        ordersRes,
+        analyticsRes,
+        earningsRes,
+      ] = await Promise.all([
         api.get("/products/my-products"),
         api.get("/orders/seller"),
         api.get("/analytics/seller"),
+        api.get("/analytics/seller/earnings"),
       ]);
 
-      setProducts(prodRes.data || []);
-      setOrders(orderRes.data || []);
+      // 🔒 Normalize responses (CRITICAL)
+      setProducts(
+        Array.isArray(productsRes.data)
+          ? productsRes.data
+          : productsRes.data.products || []
+      );
+
+      setOrders(
+        Array.isArray(ordersRes.data)
+          ? ordersRes.data
+          : ordersRes.data.orders || []
+      );
+
       setAnalytics(analyticsRes.data || null);
-    } catch (err) {
-      console.error("Dashboard fetch failed", err);
+      setEarnings(earningsRes.data || null);
+    } catch (error) {
+      console.error("Seller dashboard fetch failed:", error);
     }
   };
 
@@ -58,64 +59,22 @@ export default function SellerDashboard() {
     fetchData();
   }, []);
 
-  /* ===================== FORM HANDLERS ===================== */
+  /* ================= DERIVED METRICS ================= */
+  const pendingOrders = orders.filter(o => o.status === "pending").length;
+  const shippedOrders = orders.filter(o => o.status === "shipped").length;
+  const deliveredOrders = orders.filter(o => o.status === "delivered").length;
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const lowStockCount = products.filter(
+    p => p.stock > 0 && p.stock <= 5
+  ).length;
 
-  const handleImages = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 6) {
-      alert("Maximum 6 images allowed");
-      return;
-    }
-    setImages(files);
-  };
+  const disabledProducts = products.filter(p => !p.isActive).length;
 
-  const resetForm = () => {
-    setShowForm(false);
-    setEditingProduct(null);
-    setImages([]);
-    setExistingImages([]);
-    setRemovedImages([]);
-    setForm({
-      title: "",
-      description: "",
-      price: "",
-      stock: "",
-      category: "",
-    });
-  };
-
-  const submitProduct = async (e) => {
-    e.preventDefault();
-
-    const fd = new FormData();
-    Object.entries(form).forEach(([k, v]) => fd.append(k, v));
-    images.forEach((img) => fd.append("images", img));
-    fd.append("removedImages", JSON.stringify(removedImages));
-
-    if (editingProduct) {
-      await api.put(`/products/${editingProduct._id}`, fd);
-    } else {
-      await api.post("/products", fd);
-    }
-
-    resetForm();
-    fetchData();
-  };
-
-  /* ===================== ORDER STATUS ===================== */
-
+  /* ================= ORDER STATUS ================= */
   const updateStatus = async (id, status) => {
     await api.put(`/orders/${id}/status`, { status });
     fetchData();
   };
-
-  /* ===================== S2.7 NOTIFICATIONS ===================== */
-
-  const lowStockProducts = analytics?.lowStockProducts || [];
-  const pendingOrders = orders.filter((o) => o.status === "pending");
 
   return (
     <Layout>
@@ -124,47 +83,48 @@ export default function SellerDashboard() {
         <div>
           <h1 className="text-3xl font-bold">Seller Dashboard</h1>
           <p className="text-sm text-gray-500">
-            Manage products, orders & revenue
+            Manage products, orders & earnings
           </p>
         </div>
 
         <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg shadow"
+          onClick={() => setShowForm(true)}
+          className="bg-indigo-600 text-white px-5 py-2 rounded-lg shadow"
         >
           + Add Product
         </button>
       </div>
 
-      {/* ================= S2.7 NOTIFICATIONS ================= */}
-      {(lowStockProducts.length > 0 || pendingOrders.length > 0) && (
-        <div className="mb-10 space-y-3">
-          {lowStockProducts.length > 0 && (
-            <div className="bg-red-50 border border-red-200 p-4 rounded">
-              ⚠ <b>{lowStockProducts.length}</b> product(s) are low on stock
-            </div>
-          )}
-
-          {pendingOrders.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded">
-              📦 <b>{pendingOrders.length}</b> pending order(s) to process
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ================= ANALYTICS (S2.6) ================= */}
+      {/* ================= CORE ANALYTICS ================= */}
       {analytics && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <Stat label="Products" value={analytics.products?.total || 0} />
-          <Stat label="Active" value={analytics.products?.active || 0} />
-          <Stat label="Orders" value={analytics.orders?.total || 0} />
-          <Stat label="Revenue" value={`₹${analytics.revenue || 0}`} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Stat label="Products" value={products.length} />
+          <Stat
+            label="Active Products"
+            value={products.filter(p => p.isActive).length}
+          />
+          <Stat label="Orders" value={orders.length} />
+          <Stat label="Revenue" value={`₹${analytics?.revenue || 0}`} />
         </div>
       )}
+
+      {/* ================= EARNINGS ================= */}
+      {earnings && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+          <EarningCard title="Total Earnings" value={`₹${earnings.totalEarnings}`} />
+          <EarningCard title="Paid Out" value={`₹${earnings.paidOut}`} />
+          <EarningCard title="Pending Payout" value={`₹${earnings.pendingPayout}`} />
+        </div>
+      )}
+
+      {/* ================= OPERATIONAL METRICS ================= */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
+        <Stat label="Pending Orders" value={pendingOrders} />
+        <Stat label="Shipped Orders" value={shippedOrders} />
+        <Stat label="Delivered Orders" value={deliveredOrders} />
+        <Stat label="Low Stock" value={lowStockCount} />
+        <Stat label="Disabled Products" value={disabledProducts} />
+      </div>
 
       {/* ================= PRODUCTS ================= */}
       <div className="bg-white rounded-xl shadow mb-14">
@@ -173,19 +133,18 @@ export default function SellerDashboard() {
         </h2>
 
         {products.length === 0 ? (
-          <p className="p-6 text-center text-gray-500">
-            No products added yet.
-          </p>
+          <p className="p-6 text-center text-gray-500">No products found.</p>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-            {products.map((p) => (
+            {products.map(p => (
               <div
                 key={p._id}
-                className="border rounded-xl overflow-hidden hover:shadow-lg transition"
+                className="border rounded-xl overflow-hidden hover:shadow-lg"
               >
                 {p.images?.length ? (
                   <img
                     src={`http://localhost:5000/uploads/${p.images[0]}`}
+                    alt={p.title}
                     className="h-44 w-full object-cover"
                   />
                 ) : (
@@ -213,21 +172,13 @@ export default function SellerDashboard() {
 
                   <div className="flex justify-between mt-4">
                     <button
-                      onClick={() => {
-                        setEditingProduct(p);
-                        setForm({
-                          title: p.title,
-                          description: p.description,
-                          price: p.price,
-                          stock: p.stock,
-                          category: p.category,
-                        });
-                        setExistingImages(p.images || []);
-                        setShowForm(true);
-                      }}
-                      className="text-sm text-indigo-600"
-                    >
-                      Edit
+                        onClick={() => {
+                          setEditingProduct(p);
+                          setShowForm(true);
+                        }}
+                        className="text-sm text-indigo-600"
+                      >
+                        Edit
                     </button>
 
                     <button
@@ -235,13 +186,9 @@ export default function SellerDashboard() {
                         await api.patch(`/products/${p._id}/toggle`);
                         fetchData();
                       }}
-                      className={`text-xs px-3 py-1 rounded ${
-                        p.isActive
-                          ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
+                      className="text-xs px-3 py-1 rounded bg-red-100 text-red-700"
                     >
-                      {p.isActive ? "Disable" : "Enable"}
+                      Toggle
                     </button>
                   </div>
                 </div>
@@ -258,7 +205,7 @@ export default function SellerDashboard() {
         {orders.length === 0 ? (
           <p className="p-6 text-center text-gray-500">No orders yet.</p>
         ) : (
-          orders.map((o) => (
+          orders.map(o => (
             <div key={o._id} className="p-5 border-t">
               <p className="font-medium">Order #{o._id}</p>
               <p className="text-sm text-gray-600">Status: {o.status}</p>
@@ -283,93 +230,32 @@ export default function SellerDashboard() {
           ))
         )}
       </div>
-
-      {/* ================= PRODUCT MODAL ================= */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-lg rounded-xl p-6 relative">
-            <button
-              onClick={resetForm}
-              className="absolute top-3 right-3"
-            >
-              ✕
-            </button>
-
-            <h2 className="text-xl font-semibold mb-4">
-              {editingProduct ? "Edit Product" : "Add Product"}
-            </h2>
-
-            <form onSubmit={submitProduct} className="space-y-4">
-              <input
-                name="title"
-                value={form.title}
-                onChange={handleChange}
-                required
-                placeholder="Title"
-                className="w-full border p-2 rounded"
-              />
-
-              <textarea
-                name="description"
-                value={form.description}
-                onChange={handleChange}
-                required
-                placeholder="Description"
-                className="w-full border p-2 rounded"
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="number"
-                  name="price"
-                  value={form.price}
-                  onChange={handleChange}
-                  required
-                  placeholder="Price"
-                  className="border p-2 rounded"
-                />
-                <input
-                  type="number"
-                  name="stock"
-                  value={form.stock}
-                  onChange={handleChange}
-                  required
-                  placeholder="Stock"
-                  className="border p-2 rounded"
-                />
-              </div>
-
-              <input
-                name="category"
-                value={form.category}
-                onChange={handleChange}
-                required
-                placeholder="Category"
-                className="w-full border p-2 rounded"
-              />
-
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={handleImages}
-              />
-
-              <button className="w-full bg-indigo-600 text-white py-2 rounded">
-                {editingProduct ? "Update Product" : "Save Product"}
-              </button>
-            </form>
-          </div>
-        </div>
+        <ProductForm
+          editingProduct={editingProduct}
+          onClose={() => {
+            setShowForm(false);
+            setEditingProduct(null);
+          }}
+          onSuccess={fetchData}
+       />
       )}
+
     </Layout>
   );
 }
 
-/* ================= STAT CARD ================= */
+/* ================= UI COMPONENTS ================= */
 const Stat = ({ label, value }) => (
   <div className="bg-white rounded-xl shadow p-5 text-center">
     <p className="text-sm text-gray-500">{label}</p>
     <p className="text-2xl font-bold">{value}</p>
+  </div>
+);
+
+const EarningCard = ({ title, value }) => (
+  <div className="bg-white rounded-xl shadow p-5 text-center">
+    <p className="text-sm text-gray-500">{title}</p>
+    <p className="text-2xl font-bold mt-1">{value}</p>
   </div>
 );
