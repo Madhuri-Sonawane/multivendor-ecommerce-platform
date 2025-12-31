@@ -15,6 +15,7 @@ exports.applySeller = async (req, res) => {
   const seller = await Seller.create({
     user: req.user._id,
     storeName,
+    isApproved: false,
   });
 
   res.status(201).json({

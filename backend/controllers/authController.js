@@ -7,36 +7,39 @@ const generateToken = require("../utils/generateToken");
    REGISTER USER / SELLER
 ================================ */
 exports.registerUser = async (req, res) => {
-  const { name, email, password, role } = req.body;
+  try {
+    const { name, email, password } = req.body;
 
-  if (!name || !email || !password || !role) {
-    return res.status(400).json({ message: "All fields are required" });
+    // ✅ role is NOT required anymore
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: "user", // ✅ ALWAYS USER
+    });
+
+    res.status(201).json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error("REGISTER ERROR:", error);
+    res.status(500).json({ message: "Server error during registration" });
   }
-
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    return res.status(400).json({ message: "User already exists" });
-  }
-
-  // ❌ DO NOT hash password here
-  // ✅ Mongoose pre-save hook will handle it
-
-  const user = await User.create({
-    name,
-    email,
-    password, // plain password here
-    role,
-  });
-
-
-  res.status(201).json({
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    token: generateToken(user._id),
-  });
 };
+
 
 /* ================================
    LOGIN USER

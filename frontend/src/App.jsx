@@ -9,6 +9,8 @@ import { useAuth } from "./context/AuthContext";
 import SellerDashboard from "./pages/SellerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import SellerPending from "./pages/SellerPending";
+import ApplySeller from "./pages/ApplySeller";
+
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -50,6 +52,17 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+              path="/apply-seller"
+              element={
+                <ProtectedRoute>
+                  <ApplySeller />
+                </ProtectedRoute>
+              }
+          />
+
+
           <Route
             path="/admin"
             element={

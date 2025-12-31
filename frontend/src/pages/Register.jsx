@@ -12,7 +12,6 @@ export default function Register() {
     confirmPassword: "",
     country: "",
     mobile: "",
-    role: "",
   });
 
   const [error, setError] = useState("");
@@ -25,21 +24,17 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
-    // basic validations
     if (form.password !== form.confirmPassword) {
       return setError("Passwords do not match");
     }
 
-    if (!form.role) {
-      return setError("Please select Customer or Seller");
-    }
-
     try {
+      // ✅ REGISTER AS USER ONLY
       await api.post("/auth/register", {
         name: form.name,
         email: form.email,
         password: form.password,
-        role: form.role,
+        role:"user",
       });
 
       alert("Registration successful. Please login.");
@@ -61,7 +56,6 @@ export default function Register() {
         )}
 
         <form onSubmit={submitHandler} className="space-y-4">
-          {/* Name */}
           <input
             type="text"
             name="name"
@@ -69,10 +63,9 @@ export default function Register() {
             value={form.name}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full px-4 py-2 border rounded-md"
           />
 
-          {/* Email */}
           <input
             type="email"
             name="email"
@@ -80,10 +73,9 @@ export default function Register() {
             value={form.email}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full px-4 py-2 border rounded-md"
           />
 
-          {/* Country */}
           <input
             type="text"
             name="country"
@@ -91,10 +83,9 @@ export default function Register() {
             value={form.country}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full px-4 py-2 border rounded-md"
           />
 
-          {/* Mobile */}
           <input
             type="tel"
             name="mobile"
@@ -102,10 +93,9 @@ export default function Register() {
             value={form.mobile}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full px-4 py-2 border rounded-md"
           />
 
-          {/* Password */}
           <input
             type="password"
             name="password"
@@ -113,10 +103,9 @@ export default function Register() {
             value={form.password}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full px-4 py-2 border rounded-md"
           />
 
-          {/* Confirm Password */}
           <input
             type="password"
             name="confirmPassword"
@@ -124,49 +113,20 @@ export default function Register() {
             value={form.confirmPassword}
             onChange={handleChange}
             required
-            className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="w-full px-4 py-2 border rounded-md"
           />
 
-          {/* ROLE SELECTION */}
-          <div className="flex justify-between gap-4 mt-2">
-            <label className="flex items-center gap-2 border rounded-md px-4 py-2 cursor-pointer w-full">
-              <input
-                type="radio"
-                name="role"
-                value="user"
-                checked={form.role === "user"}
-                onChange={handleChange}
-                required
-              />
-              Customer
-            </label>
-
-            <label className="flex items-center gap-2 border rounded-md px-4 py-2 cursor-pointer w-full">
-              <input
-                type="radio"
-                name="role"
-                value="seller"
-                checked={form.role === "seller"}
-                onChange={handleChange}
-                required
-              />
-              Seller
-            </label>
-          </div>
-
-          {/* Submit */}
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-2 rounded-md font-semibold hover:bg-indigo-700 transition"
+            className="w-full bg-indigo-600 text-white py-2 rounded-md font-semibold"
           >
             Register Now
           </button>
         </form>
 
-        {/* Login link */}
         <p className="text-sm text-center text-gray-600 mt-6">
           Already have an account?{" "}
-          <Link to="/login" className="text-indigo-600 font-medium hover:underline">
+          <Link to="/login" className="text-indigo-600 font-medium">
             Login
           </Link>
         </p>

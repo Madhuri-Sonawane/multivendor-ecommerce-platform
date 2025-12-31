@@ -15,18 +15,17 @@ exports.getPendingSellers = async (req, res) => {
 
 /* ================= APPROVE SELLER ================= */
 exports.approveSeller = async (req, res) => {
-  try {
-    const seller = await Seller.findById(req.params.id);
-    if (!seller) return res.status(404).json({ message: "Seller not found" });
+  const seller = await Seller.findById(req.params.id);
+  if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-    seller.isApproved = true;
-    await seller.save();
+  seller.isApproved = true;
+  await seller.save();
 
-    res.json({ message: "Seller approved" });
-  } catch (err) {
-    res.status(500).json({ message: "Approval failed" });
-  }
+  await User.findByIdAndUpdate(seller.user, { role: "seller" });
+
+  res.json({ message: "Seller approved" });
 };
+
 
 /* ================= REJECT SELLER ================= */
 exports.rejectSeller = async (req, res) => {

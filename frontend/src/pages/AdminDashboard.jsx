@@ -3,6 +3,13 @@ import api from "../api/axios";
 import Layout from "../components/Layout";
 import { LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 
+/*
+  Admin Dashboard
+  - Platform analytics
+  - Seller approvals
+  - Payout trigger
+*/
+
 export default function AdminDashboard() {
   /* ================= STATE ================= */
   const [overview, setOverview] = useState(null);
@@ -11,7 +18,7 @@ export default function AdminDashboard() {
   const [monthlyRevenue, setMonthlyRevenue] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  /* ================= FETCH ================= */
+  /* ================= FETCH ALL DATA ================= */
   const fetchAdminData = async () => {
     try {
       const [
@@ -60,11 +67,11 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* ================= KPI ================= */}
+      {/* ================= KPI CARDS ================= */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <Stat label="Users" value={overview.users.total} />
-        <Stat label="Sellers" value={overview.users.sellers} />
-        <Stat label="Approved Sellers" value={overview.users.approvedSellers} />
+        <Stat label="Users" value={overview.users} />
+        <Stat label="Sellers" value={overview.sellers} />
+        <Stat label="Approved Sellers" value={overview.approvedSellers} />
         <Stat label="Total Products" value={overview.products.total} />
       </div>
 
@@ -77,13 +84,19 @@ export default function AdminDashboard() {
 
       {/* ================= REVENUE ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-14">
-        <Money label="Gross Revenue" value={overview.revenue} />
-        <Money label="Seller Earnings" value={overview.revenue * 0.9} />
-        <Money label="Platform Commission" value={overview.revenue * 0.1} />
-        <Money label="Pending Payout" value={0} />
+        <Money label="Gross Revenue" value={overview.revenue.gross} />
+        <Money label="Seller Earnings" value={overview.revenue.sellerEarnings} />
+        <Money
+          label="Platform Commission"
+          value={overview.revenue.platformCommission}
+        />
+        <Money
+          label="Pending Payout"
+          value={overview.revenue.pendingPayout}
+        />
       </div>
 
-      {/* ================= MONTHLY CHART ================= */}
+      {/* ================= MONTHLY REVENUE ================= */}
       <div className="bg-white rounded-xl shadow p-6 mb-14">
         <h2 className="text-xl font-semibold mb-4">Monthly Revenue</h2>
 
@@ -91,7 +104,12 @@ export default function AdminDashboard() {
           <XAxis dataKey="_id" />
           <YAxis />
           <Tooltip />
-          <Line type="monotone" dataKey="revenue" stroke="#6366f1" />
+          <Line
+            type="monotone"
+            dataKey="revenue"
+            stroke="#6366f1"
+            strokeWidth={2}
+          />
         </LineChart>
       </div>
 
@@ -143,7 +161,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* ================= PENDING SELLERS ================= */}
+      {/* ================= PENDING SELLER APPROVALS ================= */}
       <div className="bg-white rounded-xl shadow">
         <h2 className="text-xl font-semibold p-5 border-b">
           Pending Seller Approvals
@@ -175,7 +193,7 @@ export default function AdminDashboard() {
                         await api.patch(
                           `/admin/sellers/${s._id}/approve`
                         );
-                        fetchAdminData();
+                        await fetchAdminData();
                       }}
                       className="px-3 py-1 bg-green-600 text-white rounded"
                     >
@@ -187,7 +205,7 @@ export default function AdminDashboard() {
                         await api.patch(
                           `/admin/sellers/${s._id}/reject`
                         );
-                        fetchAdminData();
+                        await fetchAdminData();
                       }}
                       className="px-3 py-1 bg-red-600 text-white rounded"
                     >
@@ -204,7 +222,7 @@ export default function AdminDashboard() {
   );
 }
 
-/* ================= UI ================= */
+/* ================= UI COMPONENTS ================= */
 
 const Stat = ({ label, value }) => (
   <div className="bg-white rounded-xl shadow p-5 text-center">
