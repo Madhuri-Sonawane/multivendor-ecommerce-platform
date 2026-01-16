@@ -25,6 +25,15 @@ router.post(
 /* PUBLIC */
 router.get("/", getAllProducts);
 
+/* ✅ SELLER: GET OWN PRODUCTS */
+router.get(
+  "/my-products",
+  protect,
+  allowRoles("seller"),
+  getSellerProducts
+);
+
+
 /* SELLER */
 router.get("/my-products", protect, allowRoles("seller"), getSellerProducts);
 router.put(

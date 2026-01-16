@@ -2,61 +2,69 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import ProductForm from "../components/ProductForm";
-
-/*
-  Seller Dashboard
-  - S2.7 Operational metrics (frontend)
-  - S2.8 Earnings UI
-  - Fully guarded & stable
-*/
+import { useAuth } from "../context/AuthContext";
+import { Navigate } from "react-router-dom";
 
 export default function SellerDashboard() {
+  const { user } = useAuth();
+
   /* ================= STATE ================= */
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [earnings, setEarnings] = useState(null);
 
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [error, setError] = useState("");
+
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  /* ================= FETCH DATA ================= */
-  const fetchData = async () => {
+  /* ================= HARD GUARD ================= */
+  if (user?.role === "seller" && !user?.isApproved) {
+    return <Navigate to="/seller-pending" />;
+  }
+
+  /* ================= FETCH PRODUCTS (CRITICAL) ================= */
+  const fetchProducts = async () => {
     try {
-      const [
-        productsRes,
-        ordersRes,
-        analyticsRes,
-        earningsRes,
-      ] = await Promise.all([
-        api.get("/products/my-products"),
+      const res = await api.get("/products/my-products");
+      setProducts(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setError("Failed to load products");
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  /* ================= FETCH OPTIONAL DATA ================= */
+  const fetchExtras = async () => {
+    try {
+      const [ordersRes, analyticsRes, earningsRes] = await Promise.allSettled([
         api.get("/orders/seller"),
         api.get("/analytics/seller"),
         api.get("/analytics/seller/earnings"),
       ]);
 
-      // 🔒 Normalize responses (CRITICAL)
-      setProducts(
-        Array.isArray(productsRes.data)
-          ? productsRes.data
-          : productsRes.data.products || []
-      );
+      if (ordersRes.status === "fulfilled") {
+        setOrders(Array.isArray(ordersRes.value.data) ? ordersRes.value.data : []);
+      }
 
-      setOrders(
-        Array.isArray(ordersRes.data)
-          ? ordersRes.data
-          : ordersRes.data.orders || []
-      );
+      if (analyticsRes.status === "fulfilled") {
+        setAnalytics(analyticsRes.value.data);
+      }
 
-      setAnalytics(analyticsRes.data || null);
-      setEarnings(earningsRes.data || null);
-    } catch (error) {
-      console.error("Seller dashboard fetch failed:", error);
+      if (earningsRes.status === "fulfilled") {
+        setEarnings(earningsRes.value.data);
+      }
+    } catch {
+      // silently ignore — products must still show
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchProducts();   // MUST NEVER FAIL UI
+    fetchExtras();    // OPTIONAL
   }, []);
 
   /* ================= DERIVED METRICS ================= */
@@ -73,9 +81,10 @@ export default function SellerDashboard() {
   /* ================= ORDER STATUS ================= */
   const updateStatus = async (id, status) => {
     await api.put(`/orders/${id}/status`, { status });
-    fetchData();
+    fetchExtras();
   };
 
+  /* ================= RENDER ================= */
   return (
     <Layout>
       {/* ================= HEADER ================= */}
@@ -95,16 +104,13 @@ export default function SellerDashboard() {
         </button>
       </div>
 
-      {/* ================= CORE ANALYTICS ================= */}
+      {/* ================= ANALYTICS ================= */}
       {analytics && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Stat label="Products" value={products.length} />
-          <Stat
-            label="Active Products"
-            value={products.filter(p => p.isActive).length}
-          />
+          <Stat label="Active Products" value={products.filter(p => p.isActive).length} />
           <Stat label="Orders" value={orders.length} />
-          <Stat label="Revenue" value={`₹${analytics?.revenue || 0}`} />
+          <Stat label="Revenue" value={`₹${analytics.revenue || 0}`} />
         </div>
       )}
 
@@ -132,15 +138,16 @@ export default function SellerDashboard() {
           My Products ({products.length})
         </h2>
 
-        {products.length === 0 ? (
-          <p className="p-6 text-center text-gray-500">No products found.</p>
+        {loadingProducts ? (
+          <p className="p-6 text-center">Loading products...</p>
+        ) : products.length === 0 ? (
+          <p className="p-6 text-center text-gray-500">
+            No products found.
+          </p>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
             {products.map(p => (
-              <div
-                key={p._id}
-                className="border rounded-xl overflow-hidden hover:shadow-lg"
-              >
+              <div key={p._id} className="border rounded-xl overflow-hidden">
                 {p.images?.length ? (
                   <img
                     src={`http://localhost:5000/uploads/${p.images[0]}`}
@@ -154,37 +161,25 @@ export default function SellerDashboard() {
                 )}
 
                 <div className="p-4">
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded ${
-                      p.isActive
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-200 text-gray-600"
-                    }`}
-                  >
-                    {p.isActive ? "Active" : "Disabled"}
-                  </span>
-
-                  <h3 className="font-semibold mt-2">{p.title}</h3>
+                  <h3 className="font-semibold">{p.title}</h3>
                   <p className="text-sm text-gray-500">{p.category}</p>
-                  <p className="text-sm mt-1">
-                    ₹{p.price} · Stock: {p.stock}
-                  </p>
+                  <p className="mt-1">₹{p.price} · Stock: {p.stock}</p>
 
                   <div className="flex justify-between mt-4">
                     <button
-                        onClick={() => {
-                          setEditingProduct(p);
-                          setShowForm(true);
-                        }}
-                        className="text-sm text-indigo-600"
-                      >
-                        Edit
+                      onClick={() => {
+                        setEditingProduct(p);
+                        setShowForm(true);
+                      }}
+                      className="text-sm text-indigo-600"
+                    >
+                      Edit
                     </button>
 
                     <button
                       onClick={async () => {
                         await api.patch(`/products/${p._id}/toggle`);
-                        fetchData();
+                        fetchProducts();
                       }}
                       className="text-xs px-3 py-1 rounded bg-red-100 text-red-700"
                     >
@@ -230,6 +225,7 @@ export default function SellerDashboard() {
           ))
         )}
       </div>
+
       {showForm && (
         <ProductForm
           editingProduct={editingProduct}
@@ -237,15 +233,14 @@ export default function SellerDashboard() {
             setShowForm(false);
             setEditingProduct(null);
           }}
-          onSuccess={fetchData}
-       />
+          onSuccess={fetchProducts}
+        />
       )}
-
     </Layout>
   );
 }
 
-/* ================= UI COMPONENTS ================= */
+/* ================= UI ================= */
 const Stat = ({ label, value }) => (
   <div className="bg-white rounded-xl shadow p-5 text-center">
     <p className="text-sm text-gray-500">{label}</p>

@@ -6,10 +6,20 @@ export default function ProtectedRoute({ children, role }) {
 
   if (loading) return <p>Loading...</p>;
 
-  if (!user) return <Navigate to="/login" />;
-
-  if (role && user.role !== role)
+  // Not logged in
+  if (!user) {
     return <Navigate to="/login" />;
+  }
+
+  // Seller role but not approved yet
+  if (user.role === "seller" && user.isApproved === false) {
+    return <Navigate to="/seller-pending" />;
+  }
+
+  // Role-based protection
+  if (role && user.role !== role) {
+    return <Navigate to="/login" />;
+  }
 
   return children;
 }

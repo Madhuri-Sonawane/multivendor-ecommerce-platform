@@ -39,7 +39,15 @@ exports.createProduct = async (req, res) => {
 exports.getSellerProducts = async (req, res) => {
   try {
     const seller = await Seller.findOne({ user: req.user._id });
-    if (!seller) return res.status(404).json({ message: "Seller not found" });
+     if (!seller) {
+      return res.status(404).json({ message: "Seller not found" });
+    }
+
+    if (!seller.isApproved) {
+      return res.status(403).json({
+        message: "Seller not approved yet",
+      });
+    }
 
     const products = await Product.find({ seller: seller._id });
 

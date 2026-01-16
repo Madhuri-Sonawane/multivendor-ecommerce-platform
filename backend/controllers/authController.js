@@ -8,7 +8,7 @@ const generateToken = require("../utils/generateToken");
 ================================ */
 exports.registerUser = async (req, res) => {
   try {
-    //const { name, email, password } = req.body;
+    const { name, email, password } = req.body;
 
     // ✅ role is NOT required anymore
     if (!name || !email || !password) {
