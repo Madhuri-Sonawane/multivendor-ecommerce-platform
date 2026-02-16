@@ -4,7 +4,7 @@ const {
   getSellerProducts,
   getAllProducts,
   updateProduct,
-  toggleProductStatus, // ✅ IMPORTED
+  toggleProductStatus,
 } = require("../controllers/productController");
 
 const { protect } = require("../middleware/authMiddleware");
@@ -13,7 +13,7 @@ const upload = require("../middleware/upload");
 
 const router = express.Router();
 
-/* CREATE */
+/* CREATE PRODUCT */
 router.post(
   "/",
   protect,
@@ -22,10 +22,10 @@ router.post(
   createProduct
 );
 
-/* PUBLIC */
+/* PUBLIC PRODUCTS */
 router.get("/", getAllProducts);
 
-/* ✅ SELLER: GET OWN PRODUCTS */
+/* SELLER PRODUCTS */
 router.get(
   "/my-products",
   protect,
@@ -33,9 +33,7 @@ router.get(
   getSellerProducts
 );
 
-
-/* SELLER */
-router.get("/my-products", protect, allowRoles("seller"), getSellerProducts);
+/* UPDATE PRODUCT */
 router.put(
   "/:id",
   protect,
@@ -44,7 +42,7 @@ router.put(
   updateProduct
 );
 
-/* SOFT DELETE */
+/* TOGGLE PRODUCT STATUS */
 router.patch(
   "/:id/toggle",
   protect,

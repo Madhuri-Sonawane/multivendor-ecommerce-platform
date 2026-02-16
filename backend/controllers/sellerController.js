@@ -5,9 +5,6 @@ const User = require("../models/User");
 exports.applySeller = async (req, res) => {
   const { storeName } = req.body;
 
-  if (!storeName)
-    return res.status(400).json({ message: "Store name is required" });
-
   const existingSeller = await Seller.findOne({ user: req.user._id });
   if (existingSeller)
     return res.status(400).json({ message: "Seller already exists" });
@@ -18,6 +15,10 @@ exports.applySeller = async (req, res) => {
     isApproved: false,
   });
 
+  // 🔥 Emit event to admin
+  const io = req.app.get("io");
+  io.emit("newSellerApplication", seller);
+
   res.status(201).json({
     message: "Seller application submitted",
     seller,
@@ -26,19 +27,26 @@ exports.applySeller = async (req, res) => {
 
 /* ADMIN: APPROVE SELLER */
 exports.approveSeller = async (req, res) => {
-  const seller = await Seller.findById(req.params.id);
+  try {
+    const seller = await Seller.findById(req.params.id);
 
-  if (!seller)
-    return res.status(404).json({ message: "Seller not found" });
+    if (!seller) {
+      return res.status(404).json({ message: "Seller not found" });
+    }
 
-  seller.isApproved = true;
-  await seller.save();
+    seller.isApproved = true;
+    await seller.save();
 
-  // update user role
-  await User.findByIdAndUpdate(seller.user, { role: "seller" });
+    // Update user role
+    await User.findByIdAndUpdate(seller.user, { role: "seller" });
 
-  res.json({ message: "Seller approved" });
+    res.json({ message: "Seller approved successfully" });
+  } catch (err) {
+    console.error("APPROVE SELLER ERROR:", err);
+    res.status(500).json({ message: "Approval failed" });
+  }
 };
+
 
 /* ADMIN: GET ALL SELLERS */
 exports.getAllSellers = async (req, res) => {

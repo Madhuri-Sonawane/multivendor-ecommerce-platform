@@ -40,7 +40,6 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-
 /* ================================
    LOGIN USER
 ================================ */
@@ -74,5 +73,42 @@ exports.loginUser = async (req, res) => {
     role: user.role,
     isApproved,
     token: generateToken(user._id),
+  });
+};
+
+exports.getMe = async (req, res) => {
+  try {
+    const seller = await Seller.findOne({ user: req.user._id });
+
+    res.json({
+      _id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+      isApproved: seller ? seller.isApproved : true,
+      token: req.headers.authorization.split(" ")[1],
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch user" });
+  }
+};
+
+/* ================= CURRENT USER ================= */
+exports.getCurrentUser = async (req, res) => {
+  const user = await User.findById(req.user._id);
+
+  let isApproved = true;
+
+  if (user.role === "seller") {
+    const seller = await Seller.findOne({ user: user._id });
+    isApproved = seller?.isApproved || false;
+  }
+
+  res.json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    isApproved,
   });
 };

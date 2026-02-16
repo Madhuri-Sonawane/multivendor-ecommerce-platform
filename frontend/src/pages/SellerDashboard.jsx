@@ -1,36 +1,47 @@
 import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import ProductForm from "../components/ProductForm";
-import { useAuth } from "../context/AuthContext";
-import { Navigate } from "react-router-dom";
+import socket from "../socket"
+
 
 export default function SellerDashboard() {
-  const { user } = useAuth();
+  const { user } = useAuthuseEffect(() => {
+  refreshUser();
+}, []);
+
+  /* ================= HARD AUTH GUARD ================= */
+if (!user) return <Navigate to="/login" />;
+
+if (user.role !== "seller") {
+  return <Navigate to="/dashboard" />;
+}
+
+if (!user.isApproved) {
+  return <Navigate to="/seller-pending" />;
+}
 
   /* ================= STATE ================= */
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [earnings, setEarnings] = useState(null);
-
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [error, setError] = useState("");
-
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-
-  /* ================= HARD GUARD ================= */
-  if (user?.role === "seller" && !user?.isApproved) {
-    return <Navigate to="/seller-pending" />;
-  }
+ 
 
   /* ================= FETCH PRODUCTS (CRITICAL) ================= */
   const fetchProducts = async () => {
     try {
+      setLoadingProducts(true);
       const res = await api.get("/products/my-products");
       setProducts(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
+      console.error("PRODUCT FETCH ERROR:", err);
       setError("Failed to load products");
     } finally {
       setLoadingProducts(false);
@@ -40,14 +51,19 @@ export default function SellerDashboard() {
   /* ================= FETCH OPTIONAL DATA ================= */
   const fetchExtras = async () => {
     try {
-      const [ordersRes, analyticsRes, earningsRes] = await Promise.allSettled([
-        api.get("/orders/seller"),
-        api.get("/analytics/seller"),
-        api.get("/analytics/seller/earnings"),
-      ]);
+      const [ordersRes, analyticsRes, earningsRes] =
+        await Promise.allSettled([
+          api.get("/orders/seller"),
+          api.get("/analytics/seller"),
+          api.get("/analytics/seller/earnings"),
+        ]);
 
       if (ordersRes.status === "fulfilled") {
-        setOrders(Array.isArray(ordersRes.value.data) ? ordersRes.value.data : []);
+        setOrders(
+          Array.isArray(ordersRes.value.data)
+            ? ordersRes.value.data
+            : []
+        );
       }
 
       if (analyticsRes.status === "fulfilled") {
@@ -57,15 +73,27 @@ export default function SellerDashboard() {
       if (earningsRes.status === "fulfilled") {
         setEarnings(earningsRes.value.data);
       }
-    } catch {
-      // silently ignore — products must still show
+    } catch (err) {
+      console.error("OPTIONAL FETCH ERROR:", err);
     }
   };
 
   useEffect(() => {
-    fetchProducts();   // MUST NEVER FAIL UI
-    fetchExtras();    // OPTIONAL
+    fetchProducts(); // must always work
+    fetchExtras();   // optional
   }, []);
+
+useEffect(() => {
+  socket.on("sellerApproved", (userId) => {
+    if (user?._id === userId) {
+      window.location.reload();
+    }
+  });
+
+  return () => {
+    socket.off("sellerApproved");
+  };
+}, [user]);
 
   /* ================= DERIVED METRICS ================= */
   const pendingOrders = orders.filter(o => o.status === "pending").length;
@@ -80,14 +108,28 @@ export default function SellerDashboard() {
 
   /* ================= ORDER STATUS ================= */
   const updateStatus = async (id, status) => {
-    await api.put(`/orders/${id}/status`, { status });
-    fetchExtras();
+    try {
+      await api.put(`/orders/${id}/status`, { status });
+      fetchExtras();
+    } catch (err) {
+      console.error("STATUS UPDATE ERROR:", err);
+    }
+  };
+
+  /* ================= TOGGLE PRODUCT ================= */
+  const handleToggle = async (id) => {
+    try {
+      await api.patch(`/products/${id}/toggle`);
+      fetchProducts(); // hard refresh products
+    } catch (err) {
+      console.error("TOGGLE ERROR:", err);
+    }
   };
 
   /* ================= RENDER ================= */
   return (
     <Layout>
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-3xl font-bold">Seller Dashboard</h1>
@@ -104,17 +146,20 @@ export default function SellerDashboard() {
         </button>
       </div>
 
-      {/* ================= ANALYTICS ================= */}
+      {/* ANALYTICS */}
       {analytics && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Stat label="Products" value={products.length} />
-          <Stat label="Active Products" value={products.filter(p => p.isActive).length} />
+          <Stat
+            label="Active Products"
+            value={products.filter(p => p.isActive).length}
+          />
           <Stat label="Orders" value={orders.length} />
           <Stat label="Revenue" value={`₹${analytics.revenue || 0}`} />
         </div>
       )}
 
-      {/* ================= EARNINGS ================= */}
+      {/* EARNINGS */}
       {earnings && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
           <EarningCard title="Total Earnings" value={`₹${earnings.totalEarnings}`} />
@@ -123,7 +168,7 @@ export default function SellerDashboard() {
         </div>
       )}
 
-      {/* ================= OPERATIONAL METRICS ================= */}
+      {/* OPERATIONAL METRICS */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
         <Stat label="Pending Orders" value={pendingOrders} />
         <Stat label="Shipped Orders" value={shippedOrders} />
@@ -132,7 +177,7 @@ export default function SellerDashboard() {
         <Stat label="Disabled Products" value={disabledProducts} />
       </div>
 
-      {/* ================= PRODUCTS ================= */}
+      {/* PRODUCTS */}
       <div className="bg-white rounded-xl shadow mb-14">
         <h2 className="text-xl font-semibold p-5 border-b">
           My Products ({products.length})
@@ -163,7 +208,9 @@ export default function SellerDashboard() {
                 <div className="p-4">
                   <h3 className="font-semibold">{p.title}</h3>
                   <p className="text-sm text-gray-500">{p.category}</p>
-                  <p className="mt-1">₹{p.price} · Stock: {p.stock}</p>
+                  <p className="mt-1">
+                    ₹{p.price} · Stock: {p.stock}
+                  </p>
 
                   <div className="flex justify-between mt-4">
                     <button
@@ -177,10 +224,7 @@ export default function SellerDashboard() {
                     </button>
 
                     <button
-                      onClick={async () => {
-                        await api.patch(`/products/${p._id}/toggle`);
-                        fetchProducts();
-                      }}
+                      onClick={() => handleToggle(p._id)}
                       className="text-xs px-3 py-1 rounded bg-red-100 text-red-700"
                     >
                       Toggle
@@ -193,17 +237,21 @@ export default function SellerDashboard() {
         )}
       </div>
 
-      {/* ================= ORDERS ================= */}
+      {/* ORDERS */}
       <div className="bg-white rounded-xl shadow">
         <h2 className="text-xl font-semibold p-5 border-b">Orders</h2>
 
         {orders.length === 0 ? (
-          <p className="p-6 text-center text-gray-500">No orders yet.</p>
+          <p className="p-6 text-center text-gray-500">
+            No orders yet.
+          </p>
         ) : (
           orders.map(o => (
             <div key={o._id} className="p-5 border-t">
               <p className="font-medium">Order #{o._id}</p>
-              <p className="text-sm text-gray-600">Status: {o.status}</p>
+              <p className="text-sm text-gray-600">
+                Status: {o.status}
+              </p>
 
               <div className="space-x-2 mt-3">
                 <button
@@ -226,6 +274,7 @@ export default function SellerDashboard() {
         )}
       </div>
 
+      {/* PRODUCT FORM MODAL */}
       {showForm && (
         <ProductForm
           editingProduct={editingProduct}
@@ -240,7 +289,8 @@ export default function SellerDashboard() {
   );
 }
 
-/* ================= UI ================= */
+/* ================= UI COMPONENTS ================= */
+
 const Stat = ({ label, value }) => (
   <div className="bg-white rounded-xl shadow p-5 text-center">
     <p className="text-sm text-gray-500">{label}</p>

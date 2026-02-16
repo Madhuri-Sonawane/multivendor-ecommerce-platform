@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import { LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
+import socket from "../socket"
 
 /*
   Admin Dashboard
@@ -47,6 +48,16 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchAdminData();
   }, []);
+
+useEffect(() => {
+  socket.on("newSellerApplication", () => {
+    fetchAdminData();
+  });
+
+  return () => {
+    socket.off("newSellerApplication");
+  };
+}, []);
 
   /* ================= LOADING ================= */
   if (loading || !overview) {

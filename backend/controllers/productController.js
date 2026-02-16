@@ -129,23 +129,35 @@ exports.updateProduct = async (req, res) => {
 exports.toggleProductStatus = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
-    if (!product)
-      return res.status(404).json({ message: "Product not found" });
 
-    const seller = await Seller.findOne({ user: req.user._id });
-    if (!seller || product.seller.toString() !== seller._id.toString()) {
-      return res.status(403).json({ message: "Unauthorized" });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
     }
 
-    product.isActive = !product.isActive;
+    const seller = await Seller.findOne({ user: req.user._id });
+
+    if (!seller) {
+      return res.status(403).json({ message: "Seller not found" });
+    }
+
+    // 🔒 HARD OWNERSHIP CHECK
+    if (product.seller.toString() !== seller._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // ✅ GUARANTEED BOOLEAN
+    product.isActive = product.isActive === false ? true : false;
+
     await product.save();
 
     res.json({
-      message: `Product ${product.isActive ? "enabled" : "disabled"}`,
+      success: true,
+      productId: product._id,
       isActive: product.isActive,
     });
   } catch (err) {
     console.error("TOGGLE PRODUCT ERROR:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Toggle failed" });
   }
 };
+
