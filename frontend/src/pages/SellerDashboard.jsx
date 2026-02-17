@@ -4,24 +4,21 @@ import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import Layout from "../components/Layout";
 import ProductForm from "../components/ProductForm";
-import socket from "../socket"
-
+import socket from "../socket";
 
 export default function SellerDashboard() {
-  const { user } = useAuthuseEffect(() => {
-  refreshUser();
-}, []);
+  const { user } = useAuth();
 
   /* ================= HARD AUTH GUARD ================= */
-if (!user) return <Navigate to="/login" />;
+  if (!user) return <Navigate to="/login" />;
 
-if (user.role !== "seller") {
-  return <Navigate to="/dashboard" />;
-}
+  if (user.role !== "seller") {
+    return <Navigate to="/dashboard" />;
+  }
 
-if (!user.isApproved) {
-  return <Navigate to="/seller-pending" />;
-}
+  if (!user.isApproved) {
+    return <Navigate to="/seller-pending" />;
+  }
 
   /* ================= STATE ================= */
   const [products, setProducts] = useState([]);
@@ -32,7 +29,6 @@ if (!user.isApproved) {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
- 
 
   /* ================= FETCH PRODUCTS (CRITICAL) ================= */
   const fetchProducts = async () => {
@@ -79,21 +75,21 @@ if (!user.isApproved) {
   };
 
   useEffect(() => {
-    fetchProducts(); // must always work
-    fetchExtras();   // optional
+    fetchProducts();
+    fetchExtras();
   }, []);
 
-useEffect(() => {
-  socket.on("sellerApproved", (userId) => {
-    if (user?._id === userId) {
-      window.location.reload();
-    }
-  });
+  useEffect(() => {
+    socket.on("sellerApproved", (userId) => {
+      if (user?._id === userId) {
+        window.location.reload();
+      }
+    });
 
-  return () => {
-    socket.off("sellerApproved");
-  };
-}, [user]);
+    return () => {
+      socket.off("sellerApproved");
+    };
+  }, [user]);
 
   /* ================= DERIVED METRICS ================= */
   const pendingOrders = orders.filter(o => o.status === "pending").length;
@@ -120,7 +116,7 @@ useEffect(() => {
   const handleToggle = async (id) => {
     try {
       await api.patch(`/products/${id}/toggle`);
-      fetchProducts(); // hard refresh products
+      fetchProducts();
     } catch (err) {
       console.error("TOGGLE ERROR:", err);
     }
@@ -129,7 +125,6 @@ useEffect(() => {
   /* ================= RENDER ================= */
   return (
     <Layout>
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-3xl font-bold">Seller Dashboard</h1>
@@ -146,7 +141,6 @@ useEffect(() => {
         </button>
       </div>
 
-      {/* ANALYTICS */}
       {analytics && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Stat label="Products" value={products.length} />
@@ -159,7 +153,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* EARNINGS */}
       {earnings && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
           <EarningCard title="Total Earnings" value={`₹${earnings.totalEarnings}`} />
@@ -168,7 +161,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* OPERATIONAL METRICS */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
         <Stat label="Pending Orders" value={pendingOrders} />
         <Stat label="Shipped Orders" value={shippedOrders} />
@@ -177,7 +169,6 @@ useEffect(() => {
         <Stat label="Disabled Products" value={disabledProducts} />
       </div>
 
-      {/* PRODUCTS */}
       <div className="bg-white rounded-xl shadow mb-14">
         <h2 className="text-xl font-semibold p-5 border-b">
           My Products ({products.length})
@@ -237,7 +228,6 @@ useEffect(() => {
         )}
       </div>
 
-      {/* ORDERS */}
       <div className="bg-white rounded-xl shadow">
         <h2 className="text-xl font-semibold p-5 border-b">Orders</h2>
 
@@ -274,7 +264,6 @@ useEffect(() => {
         )}
       </div>
 
-      {/* PRODUCT FORM MODAL */}
       {showForm && (
         <ProductForm
           editingProduct={editingProduct}
@@ -288,8 +277,6 @@ useEffect(() => {
     </Layout>
   );
 }
-
-/* ================= UI COMPONENTS ================= */
 
 const Stat = ({ label, value }) => (
   <div className="bg-white rounded-xl shadow p-5 text-center">

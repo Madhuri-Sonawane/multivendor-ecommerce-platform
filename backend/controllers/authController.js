@@ -1,16 +1,12 @@
 const User = require("../models/User");
 const Seller = require("../models/Seller");
-const bcrypt = require("bcryptjs");
 const generateToken = require("../utils/generateToken");
 
-/* ================================
-   REGISTER USER / SELLER
-================================ */
+/* ================= REGISTER USER ================= */
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // ✅ role is NOT required anymore
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -24,7 +20,7 @@ exports.registerUser = async (req, res) => {
       name,
       email,
       password,
-      role: "user", // ✅ ALWAYS USER
+      role: "user",
     });
 
     res.status(201).json({
@@ -32,83 +28,57 @@ exports.registerUser = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      isApproved: false,
       token: generateToken(user._id),
     });
+
   } catch (error) {
     console.error("REGISTER ERROR:", error);
-    res.status(500).json({ message: "Server error during registration" });
+    res.status(500).json({ message: "Registration failed" });
   }
 };
 
-/* ================================
-   LOGIN USER
-================================ */
+
+/* ================= LOGIN USER ================= */
 exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  const user = await User.findOne({ email }).select("+password");
-  if (!user) {
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
-
-  // Use bcrypt directly OR model method
-  const isMatch = await bcrypt.compare(password, user.password);
-  // OR: await user.matchPassword(password);
-
-  if (!isMatch) {
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
-
-  let isApproved = true;
-
-  if (user.role === "seller") {
-    const seller = await Seller.findOne({ user: user._id });
-    isApproved = seller?.isApproved || false;
-  }
-
-  res.json({
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    isApproved,
-    token: generateToken(user._id),
-  });
-};
-
-exports.getMe = async (req, res) => {
   try {
-    const seller = await Seller.findOne({ user: req.user._id });
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email }).select("+password");
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const isMatch = await user.matchPassword(password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // 🔥 CRITICAL PART — CHECK SELLER APPROVAL
+    let isApproved = false;
+
+    if (user.role === "seller") {
+      const seller = await Seller.findOne({ user: user._id });
+      isApproved = seller?.isApproved || false;
+    }
 
     res.json({
-      _id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-      role: req.user.role,
-      isApproved: seller ? seller.isApproved : true,
-      token: req.headers.authorization.split(" ")[1],
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isApproved,
+      token: generateToken(user._id),
     });
-  } catch (err) {
-    res.status(500).json({ message: "Failed to fetch user" });
+
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+    res.status(500).json({ message: "Login failed" });
   }
 };
 
-/* ================= CURRENT USER ================= */
 exports.getCurrentUser = async (req, res) => {
-  const user = await User.findById(req.user._id);
-
-  let isApproved = true;
-
-  if (user.role === "seller") {
-    const seller = await Seller.findOne({ user: user._id });
-    isApproved = seller?.isApproved || false;
-  }
-
-  res.json({
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    isApproved,
-  });
+  res.json(req.user);
 };
