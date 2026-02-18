@@ -16,17 +16,17 @@ export default function Login() {
 
     try {
       await login(email, password);
-      const user = JSON.parse(localStorage.getItem("user"));
-
-      if (user.role === "seller" && !user.isApproved) {
-        navigate("/seller-pending");
-      } else if (user.role === "seller") {
-        navigate("/seller");
-      } else if (user.role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/products");
-      }
+         const user = JSON.parse(localStorage.getItem("user"));
+         
+         if (user.role === "seller" && !user.isApproved) {
+           navigate("/seller-pending");
+         } else if (user.role === "seller") {
+           navigate("/seller");
+         } else if (user.role === "admin") {
+           navigate("/admin");
+         } else {
+           navigate("/products");
+         }
     } catch (err) {
       setError("Invalid email or password");
     }

@@ -5,6 +5,8 @@ import api from "../api/axios";
 export default function Register() {
   const navigate = useNavigate();
 
+  const [role, setRole] = useState("user");
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -29,16 +31,18 @@ export default function Register() {
     }
 
     try {
-      // ✅ REGISTER AS USER ONLY
       await api.post("/auth/register", {
         name: form.name,
         email: form.email,
         password: form.password,
-        role:"user",
+        role: role,
       });
 
-      alert("Registration successful. Please login.");
-      navigate("/login");
+      if (role === "seller") {
+        navigate("/seller-pending");
+      } else {
+        navigate("/products");
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
     }
@@ -46,13 +50,15 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 px-4">
-      <div className="w-full max-w-md bg-white/90 backdrop-blur rounded-2xl shadow-xl p-8">
-        <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+        <h2 className="text-2xl font-bold text-center mb-6">
           Create Account
         </h2>
 
         {error && (
-          <p className="text-sm text-red-600 text-center mb-4">{error}</p>
+          <p className="text-sm text-red-600 text-center mb-4">
+            {error}
+          </p>
         )}
 
         <form onSubmit={submitHandler} className="space-y-4">
@@ -71,26 +77,6 @@ export default function Register() {
             name="email"
             placeholder="Email Address"
             value={form.email}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 border rounded-md"
-          />
-
-          <input
-            type="text"
-            name="country"
-            placeholder="Country"
-            value={form.country}
-            onChange={handleChange}
-            required
-            className="w-full px-4 py-2 border rounded-md"
-          />
-
-          <input
-            type="tel"
-            name="mobile"
-            placeholder="Mobile Number"
-            value={form.mobile}
             onChange={handleChange}
             required
             className="w-full px-4 py-2 border rounded-md"
@@ -116,17 +102,44 @@ export default function Register() {
             className="w-full px-4 py-2 border rounded-md"
           />
 
+          {/* ROLE SELECTION */}
+          <div className="flex gap-3 mt-4">
+            <button
+              type="button"
+              onClick={() => setRole("user")}
+              className={`w-full py-2 rounded ${
+                role === "user"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-200"
+              }`}
+            >
+              Register as Customer
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setRole("seller")}
+              className={`w-full py-2 rounded ${
+                role === "seller"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-200"
+              }`}
+            >
+              Register as Seller
+            </button>
+          </div>
+
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-2 rounded-md font-semibold"
+            className="w-full bg-black text-white py-2 rounded-md mt-4"
           >
-            Register Now
+            Create Account
           </button>
         </form>
 
-        <p className="text-sm text-center text-gray-600 mt-6">
+        <p className="text-sm text-center mt-6">
           Already have an account?{" "}
-          <Link to="/login" className="text-indigo-600 font-medium">
+          <Link to="/login" className="text-indigo-600">
             Login
           </Link>
         </p>
