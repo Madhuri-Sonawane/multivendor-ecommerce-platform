@@ -2,7 +2,59 @@ const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const Seller = require("../models/Seller");
+const Razorpay = require("razorpay");
 const crypto = require("crypto");
+
+/* ================= RAZORPAY INSTANCE ================= */
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+/* ================= CREATE RAZORPAY ORDER ================= */
+
+exports.createRazorpayOrder = async (req, res) => {
+  try {
+    const cart = await Cart.findOne({ user: req.user._id }).populate(
+      "items.product"
+    );
+
+    if (!cart || cart.items.length === 0) {
+      return res.status(400).json({ message: "Cart is empty" });
+    }
+
+    let totalAmount = 0;
+
+    for (const item of cart.items) {
+      const product = item.product;
+
+      if (!product.isActive || product.stock < item.quantity) {
+        return res.status(400).json({
+          message: `Product ${product.title} unavailable`,
+        });
+      }
+
+      totalAmount += product.price * item.quantity;
+    }
+
+    const options = {
+      amount: totalAmount * 100, // Razorpay uses paise
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    res.json(order);
+
+  } catch (error) {
+    console.error("CREATE ORDER ERROR:", error);
+    res.status(500).json({ message: "Failed to create Razorpay order" });
+  }
+};
+
+/* ================= VERIFY PAYMENT ================= */
 
 exports.verifyPayment = async (req, res) => {
   try {
@@ -23,8 +75,6 @@ exports.verifyPayment = async (req, res) => {
       return res.status(400).json({ message: "Invalid payment signature" });
     }
 
-    /* ================= GET CART ================= */
-
     const cart = await Cart.findOne({ user: req.user._id }).populate(
       "items.product"
     );
@@ -33,18 +83,10 @@ exports.verifyPayment = async (req, res) => {
       return res.status(400).json({ message: "Cart is empty" });
     }
 
-    /* ================= GROUP BY SELLER ================= */
-
     const sellerMap = {};
 
     for (const item of cart.items) {
       const product = item.product;
-
-      if (!product.isActive || product.stock < item.quantity) {
-        return res.status(400).json({
-          message: `Product ${product.title} unavailable`,
-        });
-      }
 
       const sellerId = product.seller.toString();
 
@@ -65,8 +107,6 @@ exports.verifyPayment = async (req, res) => {
         product.price * item.quantity;
     }
 
-    /* ================= CREATE ORDERS ================= */
-
     for (const sellerId in sellerMap) {
       const sellerData = sellerMap[sellerId];
 
@@ -75,17 +115,13 @@ exports.verifyPayment = async (req, res) => {
         seller: sellerId,
         items: sellerData.items,
         totalAmount: sellerData.totalAmount,
-        paymentId: razorpay_payment_id,
-        paymentStatus: "paid",
         status: "paid",
       });
 
-      /* ================= UPDATE SELLER REVENUE ================= */
       await Seller.findByIdAndUpdate(sellerId, {
         $inc: { revenue: sellerData.totalAmount },
       });
 
-      /* ================= REDUCE STOCK ================= */
       for (const item of sellerData.items) {
         await Product.findByIdAndUpdate(item.product, {
           $inc: { stock: -item.quantity },
@@ -93,7 +129,6 @@ exports.verifyPayment = async (req, res) => {
       }
     }
 
-    /* ================= CLEAR CART ================= */
     cart.items = [];
     await cart.save();
 
