@@ -21,25 +21,24 @@ const orderSchema = new mongoose.Schema(
           ref: "Product",
           required: true,
         },
-        quantity: {
-          type: Number,
-          required: true,
-        },
-        priceAtPurchase: {
-          type: Number,
-          required: true,
-        },
+        quantity: Number,
+        priceAtPurchase: Number,
       },
     ],
 
-    totalAmount: {
-      type: Number,
-      required: true,
-    },
+    totalAmount: Number,
 
     status: {
       type: String,
       enum: ["pending", "paid", "shipped", "delivered", "cancelled"],
+      default: "pending",
+    },
+
+    paymentId: String,
+
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed"],
       default: "pending",
     },
   },
