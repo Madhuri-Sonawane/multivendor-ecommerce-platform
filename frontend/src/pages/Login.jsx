@@ -36,7 +36,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
         <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
-          Member Login
+           Login
         </h2>
 
         {error && (
