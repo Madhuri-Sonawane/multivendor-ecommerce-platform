@@ -131,7 +131,7 @@ useEffect(() => {
         </h2>
 
         {sellers.length === 0 ? (
-          <p className="p-6 text-center text-gray-500">No sellers found</p>
+          <p className="p-6 text-center text-gray-700">No sellers found</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
@@ -206,7 +206,7 @@ useEffect(() => {
                         );
                         await fetchAdminData();
                       }}
-                      className="px-3 py-1 bg-green-600 text-white rounded"
+                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-200"
                     >
                       Approve
                     </button>
@@ -218,7 +218,7 @@ useEffect(() => {
                         );
                         await fetchAdminData();
                       }}
-                      className="px-3 py-1 bg-red-600 text-white rounded"
+                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-400"
                     >
                       Reject
                     </button>

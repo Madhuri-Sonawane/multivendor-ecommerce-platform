@@ -10,7 +10,7 @@ export default function Dashboard() {
 
       <div className="bg-white p-6 rounded shadow">
         <p className="text-lg">Welcome, {user?.name}</p>
-        <p className="text-gray-600">Role: {user?.role}</p>
+        <p className="text-gray-800">Role: {user?.role}</p>
       </div>
     </Layout>
   );

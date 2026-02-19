@@ -59,7 +59,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-600">
+            <label className="block text-sm font-medium text-black">
               Password
             </label>
             <input
@@ -82,7 +82,7 @@ export default function Login() {
 
         {/* REGISTER CTA */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-800">
             New user?{" "}
             <Link
               to="/register"
