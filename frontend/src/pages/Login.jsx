@@ -16,17 +16,24 @@ export default function Login() {
 
     try {
       await login(email, password);
-         const user = JSON.parse(localStorage.getItem("user"));
-         
-         if (user.role === "seller" && !user.isApproved) {
-           navigate("/seller-pending");
-         } else if (user.role === "seller") {
-           navigate("/seller");
-         } else if (user.role === "admin") {
-           navigate("/admin");
-         } else {
-           navigate("/products");
-         }
+
+      const storedUser = JSON.parse(localStorage.getItem("user"));
+
+      if (!storedUser) {
+        navigate("/login");
+        return;
+      }
+
+      if (storedUser.role === "seller" && !storedUser.isApproved) {
+        navigate("/seller-pending");
+      } else if (storedUser.role === "seller") {
+        navigate("/seller");
+      } else if (storedUser.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/user/profile");
+      }
+
     } catch (err) {
       setError("Invalid email or password");
     }
@@ -36,7 +43,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
         <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
-           Login
+          Login
         </h2>
 
         {error && (
@@ -44,33 +51,23 @@ export default function Login() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Email
-            </label>
-            <input
-              type="email"
-              className="mt-1 w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
+          <input
+            type="email"
+            placeholder="Enter your email"
+            className="w-full px-4 py-2 border rounded-md"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-black">
-              Password
-            </label>
-            <input
-              type="password"
-              className="mt-1 w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+          <input
+            type="password"
+            placeholder="Enter your password"
+            className="w-full px-4 py-2 border rounded-md"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
           <button
             type="submit"
@@ -80,18 +77,12 @@ export default function Login() {
           </button>
         </form>
 
-        {/* REGISTER CTA */}
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-800">
-            New user?{" "}
-            <Link
-              to="/register"
-              className="text-indigo-600 font-medium hover:underline"
-            >
-              Register here
-            </Link>
-          </p>
-        </div>
+        <p className="text-sm text-center text-gray-800 mt-6">
+          New user?{" "}
+          <Link to="/register" className="text-indigo-600 font-medium">
+            Register here
+          </Link>
+        </p>
       </div>
     </div>
   );
