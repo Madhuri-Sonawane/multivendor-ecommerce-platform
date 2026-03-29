@@ -5,7 +5,7 @@ const calculateDynamicPrice = require("../utils/priceLogic");
 /* CREATE PRODUCT */
 exports.createProduct = async (req, res) => {
   try {
-    const { title, description, price, stock, category } = req.body;
+    const { title, description, price, stock, category, subCategory, brand, mrp } = req.body;
 
     if (!title || !price || !category) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -23,8 +23,11 @@ exports.createProduct = async (req, res) => {
       title,
       description,
       price,
+      mrp: mrp || price,
       stock,
       category,
+      subCategory: subCategory || "Other",
+      brand: brand || "Generic",
       images,
     });
 
@@ -70,19 +73,48 @@ exports.getSellerProducts = async (req, res) => {
 /* PUBLIC PRODUCTS */
 exports.getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find({ isActive: true }).populate("seller");
+    const { category, subCategory, brand, minPrice, maxPrice, minDiscount } = req.query;
+    
+    // Base filter
+    const filter = { isActive: true };
+    
+    if (category) filter.category = category;
+    if (subCategory) filter.subCategory = subCategory;
+    if (brand) {
+      // brand can be comma separated e.g., ?brand=Apple,Samsung
+      filter.brand = { $in: brand.split(",") };
+    }
 
-    res.json(
-      products.map((p) => ({
-        ...p.toObject(),
-        dynamicPrice: calculateDynamicPrice({
-          basePrice: p.price,
-          stock: p.stock,
-          createdAt: p.createdAt,
-        }),
-      }))
-    );
+    const products = await Product.find(filter).populate("seller");
+
+    let mappedProducts = products.map((p) => {
+      const dynamicPrice = calculateDynamicPrice({
+        basePrice: p.price,
+        stock: p.stock,
+        createdAt: p.createdAt,
+      });
+      
+      const pObj = p.toObject();
+      const actualMrp = pObj.mrp || pObj.price;
+      const discountPercent = actualMrp > dynamicPrice 
+        ? Math.round(((actualMrp - dynamicPrice) / actualMrp) * 100) 
+        : 0;
+
+      return {
+        ...pObj,
+        dynamicPrice,
+        discountPercent,
+      };
+    });
+
+    // Post-computation filtering for price and discount
+    if (minPrice) mappedProducts = mappedProducts.filter(p => p.dynamicPrice >= Number(minPrice));
+    if (maxPrice) mappedProducts = mappedProducts.filter(p => p.dynamicPrice <= Number(maxPrice));
+    if (minDiscount) mappedProducts = mappedProducts.filter(p => p.discountPercent >= Number(minDiscount));
+
+    res.json(mappedProducts);
   } catch (err) {
+    console.error("GET PRODUCTS ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -98,7 +130,7 @@ exports.updateProduct = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    const { title, description, price, stock, category, removedImages } =
+    const { title, description, price, stock, category, subCategory, brand, mrp, removedImages } =
       req.body;
 
     if (removedImages) {
@@ -111,11 +143,14 @@ exports.updateProduct = async (req, res) => {
     const newImages = req.files?.map((f) => f.filename) || [];
     product.images.push(...newImages);
 
-    product.title = title;
-    product.description = description;
-    product.price = price;
-    product.stock = stock;
-    product.category = category;
+    product.title = title || product.title;
+    product.description = description || product.description;
+    if (price !== undefined) product.price = price;
+    if (stock !== undefined) product.stock = stock;
+    product.category = category || product.category;
+    product.subCategory = subCategory || product.subCategory;
+    product.brand = brand || product.brand;
+    if (mrp !== undefined) product.mrp = mrp;
 
     await product.save();
     res.json(product);

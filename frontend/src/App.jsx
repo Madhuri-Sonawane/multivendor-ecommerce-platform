@@ -1,10 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
+import { CartProvider } from "./context/CartContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+
+import StorefrontLayout from "./components/StorefrontLayout";
+import Home from "./pages/Home";
+import Products from "./pages/Products";
+import ProductDetails from "./pages/ProductDetails";
+import Checkout from "./pages/Checkout";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Products from "./pages/Products";
+
 import Dashboard from "./pages/Dashboard";
 import SellerDashboard from "./pages/SellerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -15,102 +22,92 @@ import UserDashboard from "./pages/UserDashboard";
 import UserProfile from "./pages/UserProfile";
 import UserOrders from "./pages/UserOrders";
 
-/* ================= ROLE BASED HOME REDIRECT ================= */
-
-function HomeRedirect() {
-  const { user } = useAuth();
-
-  if (!user) return <Navigate to="/login" />;
-
-  if (user.role === "seller") return <Navigate to="/seller" />;
-  if (user.role === "admin") return <Navigate to="/admin" />;
-  if (user.role === "user") return <Navigate to="/user/profile" />;
-
-  return <Navigate to="/login" />;
-}
-
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <CartProvider>
+        <BrowserRouter>
+          <Routes>
 
-          {/* ROOT */}
-          <Route path="/" element={<HomeRedirect />} />
+            {/* PUBLIC STOREFRONT ROUTING */}
+            <Route path="/" element={<StorefrontLayout />}>
+              <Route index element={<Home />} />
+              <Route path="products" element={<Products />} />
+              <Route path="product/:id" element={<ProductDetails />} />
+              <Route 
+                path="checkout" 
+                element={
+                  <ProtectedRoute role="user">
+                    <Checkout />
+                  </ProtectedRoute>
+                } 
+              />
+            </Route>
 
-          {/* AUTH */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+            {/* AUTH */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
-          {/* PRODUCTS */}
-          <Route
-            path="/products"
-            element={
-              <ProtectedRoute>
-                <Products />
-              </ProtectedRoute>
-            }
-          />
+            {/* GENERAL DASHBOARD */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* GENERAL DASHBOARD */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+            {/* SELLER */}
+            <Route
+              path="/seller"
+              element={
+                <ProtectedRoute role="seller">
+                  <SellerDashboard />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* SELLER */}
-          <Route
-            path="/seller"
-            element={
-              <ProtectedRoute role="seller">
-                <SellerDashboard />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/apply-seller"
+              element={
+                <ProtectedRoute>
+                  <ApplySeller />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/apply-seller"
-            element={
-              <ProtectedRoute>
-                <ApplySeller />
-              </ProtectedRoute>
-            }
-          />
+            <Route path="/seller-pending" element={<SellerPending />} />
 
-          <Route path="/seller-pending" element={<SellerPending />} />
+            {/* ADMIN */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* ADMIN */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute role="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
+            {/* USER DASHBOARD */}
+            <Route
+              path="/user"
+              element={
+                <ProtectedRoute role="user">
+                  <UserDashboard />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="profile" element={<UserProfile />} />
+              <Route path="orders" element={<UserOrders />} />
+            </Route>
 
-          {/* USER DASHBOARD */}
-          <Route
-            path="/user"
-            element={
-              <ProtectedRoute role="user">
-                <UserDashboard />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="profile" element={<UserProfile />} />
-            <Route path="orders" element={<UserOrders />} />
-          </Route>
+            {/* CATCH ALL - ALWAYS LAST */}
+            <Route path="*" element={<Navigate to="/" />} />
 
-          {/* CATCH ALL - ALWAYS LAST */}
-          <Route path="*" element={<Navigate to="/" />} />
-
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </CartProvider>
     </AuthProvider>
   );
 }

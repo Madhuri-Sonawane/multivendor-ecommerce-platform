@@ -5,36 +5,77 @@ const calculateDynamicPrice = require("../utils/priceLogic");
 
 
 
+const Cart = require("../models/Cart");
+
 exports.createOrder = async (req, res) => {
   try {
-    const product = await Product.findById(req.body.productId);
+    // 1. Fetch user cart
+    const cart = await Cart.findOne({ user: req.user._id }).populate("items.product");
 
-    if (!product)
-      return res.status(404).json({ message: "Product not found" });
+    if (!cart || cart.items.length === 0) {
+      return res.status(400).json({ message: "Cart is empty" });
+    }
 
-    if (!product.isActive)
-      return res
-        .status(400)
-        .json({ message: "Product is currently unavailable" });
+    // 2. Group items by seller
+    const sellerOrders = {};
 
-    if (product.stock <= 0)
-      return res.status(400).json({ message: "Out of stock" });
+    for (const item of cart.items) {
+      const product = item.product;
 
-    const order = await Order.create({
-      user: req.user._id,
-      seller: product.seller,
-      product: product._id,
-      price: product.price,
-      status: "pending",
-    });
+      if (!product || !product.isActive || product.stock < item.quantity) {
+        return res.status(400).json({ message: `Product ${product?.title || "Unknown"} is unavailable or out of stock` });
+      }
 
-    product.stock -= 1;
-    await product.save();
+      const sellerId = product.seller.toString();
 
-    res.status(201).json(order);
+      if (!sellerOrders[sellerId]) {
+        sellerOrders[sellerId] = {
+          items: [],
+          totalAmount: 0,
+        };
+      }
+
+      sellerOrders[sellerId].items.push({
+        product: product._id,
+        quantity: item.quantity,
+        priceAtPurchase: product.price, // simple price logic for now
+      });
+
+      sellerOrders[sellerId].totalAmount += product.price * item.quantity;
+    }
+
+    // 3. Create orders for each seller
+    const createdOrders = [];
+    for (const sellerId in sellerOrders) {
+      const orderData = sellerOrders[sellerId];
+
+      const order = await Order.create({
+        user: req.user._id,
+        seller: sellerId,
+        items: orderData.items,
+        totalAmount: orderData.totalAmount,
+        status: "pending",
+        paymentStatus: "pending", // COD
+      });
+
+      // Deduct stock
+      for (const orderItem of orderData.items) {
+        await Product.findByIdAndUpdate(orderItem.product, {
+          $inc: { stock: -orderItem.quantity },
+        });
+      }
+
+      createdOrders.push(order);
+    }
+
+    // 4. Clear cart
+    cart.items = [];
+    await cart.save();
+
+    res.status(201).json({ message: "Order(s) placed successfully via COD", orders: createdOrders });
   } catch (err) {
     console.error("CREATE ORDER ERROR:", err);
-    res.status(500).json({ message: "Order failed" });
+    res.status(500).json({ message: "Checkout failed" });
   }
 };
 

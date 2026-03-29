@@ -35,6 +35,21 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
 
+    subCategory: {
+      type: String,
+      default: "Other",
+    },
+
+    brand: {
+      type: String,
+      default: "Generic",
+    },
+
+    mrp: {
+      type: Number,
+      required: false,
+    },
+
     images: {
       type: [String],
       default: [],
